@@ -27,3 +27,30 @@ Stage Summary:
 - GitHub Actions build: SUCCESS
 - APK artifact: hitif-videodownloader-debug (5MB)
 - Features implemented: smart naming, season download, rename button
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix critical bugs - naming, extensions, season download, notifications
+
+Work Log:
+- Found and fixed critical SmartNamer bug: `replaceFirstChar { it.uppercase() } + word.drop(1).lowercase()` was duplicating characters ("dead" -> "Deadead", "account" -> "Accountccount")
+- Fixed MediaDetector: removed "ts" from VIDEO_EXTENSIONS (TS segments are HLS parts, not standalone files)
+- Added IGNORE_EXTENSIONS set for TS, subtitles, images, fonts, scripts
+- Changed buildItem to always use .mp4 extension for video/HLS/DASH content
+- Completely rewrote season download: now loads each episode page in WebView to detect actual video URL before downloading (old code downloaded HTML pages, not videos)
+- Added season processing state management with timeout, delay between episodes
+- Added download tracking notifications (like ADM/IDM style)
+- Added NotificationChannel for HITIF downloads
+- Enhanced DownloadHelper with speed boost headers (keep-alive, accept-encoding, proper referer)
+- Enhanced DownloadReceiver with completion notifications that open the file
+- Added sanitizeFilename method to DownloadHelper for robust filename handling
+- Pushed all changes to GitHub
+
+Stage Summary:
+- 5 files modified: SmartNamer.kt, MediaDetector.kt, BrowserActivity.kt, DownloadHelper.kt, DownloadReceiver.kt
+- GitHub Actions build: push successful (0e69566)
+- Key bug fix: SmartNamer naming duplication bug
+- Key feature: Season download now actually detects video URLs before downloading
+- Key feature: Download notifications like ADM/IDM
+- Key feature: Speed boost with optimized network headers
