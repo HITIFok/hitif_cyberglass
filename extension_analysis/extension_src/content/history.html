@@ -1,0 +1,5816 @@
+<!DOCTYPE html>
+
+<html dockmode="history">
+<head>
+
+<style>
+/* Hidden UI elements */
+#button_restore_purchase, #button_get_premium,
+#button_report_nomedia, #button_report, #button_reporting, #button_reported,
+#button_help, #button_show_translate,
+#box_account_not_linux, #p_leave_review,
+.report-button-container {
+    display: none !important;
+}
+</style>
+
+    <meta charset="utf-8"/>
+    <style>
+
+    :root {
+  --dismiss-button-width: calc(16px + var(--spacing-medium) + 2 * var(--hardware-pixel));
+  --dismiss-button-height: calc(16px + 2 * var(--hardware-pixel));
+  --video-height: 80px;
+}
+
+.roundedbox {
+  border-radius: 10px;
+  border-style: solid;
+  border-width: 1px;
+  background-color: var(--theme-box-bg);
+  border-color: var(--theme-box-border);
+  box-shadow: 0 1px 2px var(--theme-box-shadow);
+}    :root[theme="system"] {
+  color-scheme: light dark;
+}
+
+:root[theme="dark"] {
+  color-scheme: dark;
+}
+
+:root[theme="light"] {
+  color-scheme: light;
+}
+
+body {
+  scrollbar-color: light-dark(var(--violet-300) var(--neutral-50), var(--violet-900) var(--neutral-300));
+  color: light-dark(var(--neutral-700), var(--neutral-200));
+  background-color: light-dark(hsl(230 20% 97%), hsl(235 20% 12%));
+  --theme-selection: light-dark(var(--violet-200), var(--violet-800));
+  --theme-outline-focus: light-dark(var(--neutral-200), var(--neutral-800));
+  --theme-control-bg: light-dark(hsl(230 10% 96%), hsl(235 12% 18%));
+  --theme-control-bg-hover: light-dark(hsl(230 15% 94%), hsl(235 15% 22%));
+  --theme-control-border: light-dark(hsl(230 10% 85%), hsl(235 10% 24%));
+  --theme-control-border-focus: light-dark(var(--neutral-800), var(--neutral-200));
+  --theme-colored-fg: light-dark(var(--neutral-100), var(--neutral-900));
+  --theme-dismiss: light-dark(var(--neutral-500), var(--neutral-500));
+  --theme-dismiss-hover: light-dark(var(--neutral-600), var(--neutral-400));
+  --theme-box-bg: light-dark(hsl(230 15% 98%), hsl(235 15% 15%));
+  --theme-box-border: light-dark(hsl(230 10% 88%), hsl(235 12% 20%));
+  --theme-box-shadow: light-dark(hsl(230 30% 50% / 8%), rgb(0 0 0 / 35%));
+  --theme-progressbar-border: light-dark(var(--violet-500), var(--violet-900));
+  --theme-progressbar-bg: light-dark(var(--violet-300), var(--violet-600));
+  --theme-progressbar-fg: light-dark(var(--neutral-700), var(--neutral-300));
+}
+    *, *::before, *::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+body {
+  line-height: 1.5;
+  text-size-adjust: none;
+  font-size: 1rem;
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  -webkit-font-smoothing: antialiased;
+  font-family: system-ui, sans-serif;
+}
+
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+
+a {
+  text-decoration-skip-ink: auto;
+  color: currentColor;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+}
+
+box, hbox, vbox, spacer, stack {
+  flex-shrink: 0;
+  display: flex;
+  /*
+    These are necessary really.
+    Otherwise set to min-*: auto, messing up flex logic.
+  */
+  min-height: 0;
+  min-width: 0;
+}
+
+hbox {
+  flex-flow: row;
+  text-overflow: ellipsis;
+}
+
+wrappable-text {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+vbox {
+  flex-flow: column;
+  /* Not sure why I had that at some point… */
+  /* width: 100%; */
+}
+
+stack {
+  position: relative;
+  overflow: hidden;
+}
+
+stack > * {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+[wrap] { flex-wrap: wrap }
+[stretch] { align-self: stretch }
+[hidden="true"] { display: none!important; }
+
+[flex] { display: flex }
+[flex="1"] { flex-grow: 1 }
+[flex="2"] { flex-grow: 2 }
+[flex="3"] { flex-grow: 3 }
+[flex="4"] { flex-grow: 4 }
+[flex="5"] { flex-grow: 5 }
+[flex="6"] { flex-grow: 6 }
+[flex="7"] { flex-grow: 7 }
+[flex="8"] { flex-grow: 8 }
+[flex="9"] { flex-grow: 9 }
+
+/* We don't use the align=… attribute. Browser engines map that into a text-align=center!!! */
+[xalign="start"] { align-items: flex-start }
+[xalign="center"] { align-items: center }
+[xalign="end"] { align-items: flex-end }
+[xalign="baseline"] { align-items: flex-baseline }
+[xalign="stretch"] { align-items: stretch }
+
+[pack="start"] { justify-content: flex-start }
+[pack="center"] { justify-content: center }
+[pack="end"] { justify-content: flex-end }
+
+/* DEBUG */
+
+[debug] hbox,
+[debug] vbox,
+[debug] box,
+[debug] spacer {
+  margin: 8px;
+  padding: 8px;
+  outline: 1px dashed black;
+  position: relative;
+}
+
+/* [debug] hbox { background: green; } */
+/* [debug] vbox { background: blue; } */
+/* [debug] spacer { background: yellow; } */
+/* [debug] box { background: orange; } */
+
+[debug] hbox:before,
+[debug] vbox:before,
+[debug] box:before {
+  position: absolute;
+  font-size: 6px;
+  top: 0; left: 0;
+  display: block;
+  content: attr(id);
+}
+
+/* From https://github.com/shadcn-ui/ui/issues/669 */
+
+/* Palette: https://tailwindcss.com/docs/customizing-colors */
+
+:root {
+  /* Slate */
+  --slate-50: hsl(210 40% 98%);
+  --slate-100: hsl(210 40% 96.1%);
+  --slate-200: hsl(214.3 31.8% 91.4%);
+  --slate-300: hsl(212.7 26.8% 83.9%);
+  --slate-400: hsl(215 20.2% 65.1%);
+  --slate-500: hsl(215.4 16.3% 46.9%);
+  --slate-600: hsl(215.3 19.3% 34.5%);
+  --slate-700: hsl(215.3 25% 26.7%);
+  --slate-800: hsl(217.2 32.6% 17.5%);
+  --slate-900: hsl(222.2 47.4% 11.2%);
+  --slate-950: hsl(228.6 84% 4.9%);
+
+  /* Gray */
+  --gray-50: hsl(210 20% 98%);
+  --gray-100: hsl(220 14.3% 95.9%);
+  --gray-200: hsl(220 13% 91%);
+  --gray-300: hsl(216 12.2% 83.9%);
+  --gray-400: hsl(217.9 10.6% 64.9%);
+  --gray-500: hsl(220 8.9% 46.1%);
+  --gray-600: hsl(215 13.8% 34.1%);
+  --gray-700: hsl(216.9 19.1% 26.7%);
+  --gray-800: hsl(215 27.9% 16.9%);
+  --gray-900: hsl(220.9 39.3% 11%);
+  --gray-950: hsl(224 71.4% 4.1%);
+
+  /* Zinc */
+  --zinc-50: hsl(0 0% 98%);
+  --zinc-100: hsl(240 4.8% 95.9%);
+  --zinc-200: hsl(240 5.9% 90%);
+  --zinc-300: hsl(240 4.9% 83.9%);
+  --zinc-400: hsl(240 5% 64.9%);
+  --zinc-500: hsl(240 3.8% 46.1%);
+  --zinc-600: hsl(240 5.2% 33.9%);
+  --zinc-700: hsl(240 5.3% 26.1%);
+  --zinc-800: hsl(240 3.7% 15.9%);
+  --zinc-900: hsl(240 5.9% 10%);
+  --zinc-950: hsl(240 10% 3.9%);
+
+  /* Neutral */
+  --neutral-50: hsl(0 0% 98%);
+  --neutral-100: hsl(0 0% 96.1%);
+  --neutral-200: hsl(0 0% 89.8%);
+  --neutral-300: hsl(0 0% 83.1%);
+  --neutral-400: hsl(0 0% 63.9%);
+  --neutral-500: hsl(0 0% 45.1%);
+  --neutral-600: hsl(0 0% 32.2%);
+  --neutral-700: hsl(0 0% 25.1%);
+  --neutral-800: hsl(0 0% 14.9%);
+  --neutral-900: hsl(0 0% 9%);
+  --neutral-950: hsl(0 0% 3.9%);
+
+  /* Stone */
+  --stone-50: hsl(60 9.1% 97.8%);
+  --stone-100: hsl(60 4.8% 95.9%);
+  --stone-200: hsl(20 5.9% 90%);
+  --stone-300: hsl(24 5.7% 82.9%);
+  --stone-400: hsl(24 5.4% 63.9%);
+  --stone-500: hsl(25 5.3% 44.7%);
+  --stone-600: hsl(33.3 5.5% 32.4%);
+  --stone-700: hsl(30 6.3% 25.1%);
+  --stone-800: hsl(12 6.5% 15.1%);
+  --stone-900: hsl(24 9.8% 10%);
+  --stone-950: hsl(20 14.3% 4.1%);
+
+  /* Red */
+  --red-50: hsl(0 85.7% 97.3%);
+  --red-100: hsl(0 93.3% 94.1%);
+  --red-200: hsl(0 96.3% 89.4%);
+  --red-300: hsl(0 93.5% 81.8%);
+  --red-400: hsl(0 90.6% 70.8%);
+  --red-500: hsl(0 84.2% 60.2%);
+  --red-600: hsl(0 72.2% 50.6%);
+  --red-700: hsl(0 73.7% 41.8%);
+  --red-800: hsl(0 70% 35.3%);
+  --red-900: hsl(0 62.8% 30.6%);
+  --red-950: hsl(0 74.7% 15.5%);
+
+  /* Orange */
+  --orange-50: hsl(33.3 100% 96.5%);
+  --orange-100: hsl(34.3 100% 91.8%);
+  --orange-200: hsl(32.1 97.7% 83.1%);
+  --orange-300: hsl(30.7 97.2% 72.4%);
+  --orange-400: hsl(27 96% 61%);
+  --orange-500: hsl(24.6 95% 53.1%);
+  --orange-600: hsl(20.5 90.2% 48.2%);
+  --orange-700: hsl(17.5 88.3% 40.4%);
+  --orange-800: hsl(15 79.1% 33.7%);
+  --orange-900: hsl(15.3 74.6% 27.8%);
+  --orange-950: hsl(13 81.1% 14.5%);
+
+  /* Amber */
+  --amber-50: hsl(48 100% 96.1%);
+  --amber-100: hsl(48 96.5% 88.8%);
+  --amber-200: hsl(48 96.6% 76.7%);
+  --amber-300: hsl(45.9 96.7% 64.5%);
+  --amber-400: hsl(43.3 96.4% 56.3%);
+  --amber-500: hsl(37.7 92.1% 50.2%);
+  --amber-600: hsl(32.1 94.6% 43.7%);
+  --amber-700: hsl(26 90.5% 37.1%);
+  --amber-800: hsl(22.7 82.5% 31.4%);
+  --amber-900: hsl(21.7 77.8% 26.5%);
+  --amber-950: hsl(20.9 91.7% 14.1%);
+
+  /* Yellow */
+  --yellow-50: hsl(54.5 91.7% 95.3%);
+  --yellow-100: hsl(54.9 96.7% 88%);
+  --yellow-200: hsl(52.8 98.3% 76.9%);
+  --yellow-300: hsl(50.4 97.8% 63.5%);
+  --yellow-400: hsl(47.9 95.8% 53.1%);
+  --yellow-500: hsl(45.4 93.4% 47.5%);
+  --yellow-600: hsl(40.6 96.1% 40.4%);
+  --yellow-700: hsl(35.5 91.7% 32.9%);
+  --yellow-800: hsl(31.8 81% 28.8%);
+  --yellow-900: hsl(28.4 72.5% 25.7%);
+  --yellow-950: hsl(26 83.3% 14.1%);
+
+  /* Lime */
+  --lime-50: hsl(78.3 92% 95.1%);
+  --lime-100: hsl(79.6 89.1% 89.2%);
+  --lime-200: hsl(80.9 88.5% 79.6%);
+  --lime-300: hsl(82 84.5% 67.1%);
+  --lime-400: hsl(82.7 78% 55.5%);
+  --lime-500: hsl(83.7 80.5% 44.3%);
+  --lime-600: hsl(84.8 85.2% 34.5%);
+  --lime-700: hsl(85.9 78.4% 27.3%);
+  --lime-800: hsl(86.3 69% 22.7%);
+  --lime-900: hsl(87.6 61.2% 20.2%);
+  --lime-950: hsl(89.3 80.4% 10%);
+
+  /* Green */
+  --green-50: hsl(138.5 76.5% 96.7%);
+  --green-100: hsl(140.6 84.2% 92.5%);
+  --green-200: hsl(141 78.9% 85.1%);
+  --green-300: hsl(141.7 76.6% 73.1%);
+  --green-400: hsl(141.9 69.2% 58%);
+  --green-500: hsl(142.1 70.6% 45.3%);
+  --green-600: hsl(142.1 76.2% 36.3%);
+  --green-700: hsl(142.4 71.8% 29.2%);
+  --green-800: hsl(142.8 64.2% 24.1%);
+  --green-900: hsl(143.8 61.2% 20.2%);
+  --green-950: hsl(144.9 80.4% 10%);
+
+  /* Emerald */
+  --emerald-50: hsl(151.8 81% 95.9%);
+  --emerald-100: hsl(149.3 80.4% 90%);
+  --emerald-200: hsl(152.4 76% 80.4%);
+  --emerald-300: hsl(156.2 71.6% 66.9%);
+  --emerald-400: hsl(158.1 64.4% 51.6%);
+  --emerald-500: hsl(160.1 84.1% 39.4%);
+  --emerald-600: hsl(161.4 93.5% 30.4%);
+  --emerald-700: hsl(162.9 93.5% 24.3%);
+  --emerald-800: hsl(163.1 88.1% 19.8%);
+  --emerald-900: hsl(164.2 85.7% 16.5%);
+  --emerald-950: hsl(165.7 91.3% 9%);
+
+  /* Teal */
+  --teal-50: hsl(166.2 76.5% 96.7%);
+  --teal-100: hsl(167.2 85.5% 89.2%);
+  --teal-200: hsl(168.4 83.8% 78.2%);
+  --teal-300: hsl(170.6 76.9% 64.3%);
+  --teal-400: hsl(172.5 66% 50.4%);
+  --teal-500: hsl(173.4 80.4% 40%);
+  --teal-600: hsl(174.7 83.9% 31.6%);
+  --teal-700: hsl(175.3 77.4% 26.1%);
+  --teal-800: hsl(176.1 69.4% 21.8%);
+  --teal-900: hsl(175.9 60.8% 19%);
+  --teal-950: hsl(178.6 84.3% 10%);
+
+  /* Cyan */
+  --cyan-50: hsl(183.2 100% 96.3%);
+  --cyan-100: hsl(185.1 95.9% 90.4%);
+  --cyan-200: hsl(186.2 93.5% 81.8%);
+  --cyan-300: hsl(187 92.4% 69%);
+  --cyan-400: hsl(187.9 85.7% 53.3%);
+  --cyan-500: hsl(188.7 94.5% 42.7%);
+  --cyan-600: hsl(191.6 91.4% 36.5%);
+  --cyan-700: hsl(192.9 82.3% 31%);
+  --cyan-800: hsl(194.4 69.6% 27.1%);
+  --cyan-900: hsl(196.4 63.6% 23.7%);
+  --cyan-950: hsl(197 78.9% 14.9%);
+
+  /* Sky */
+  --sky-50: hsl(204 100% 97.1%);
+  --sky-100: hsl(204 93.8% 93.7%);
+  --sky-200: hsl(200.6 94.4% 86.1%);
+  --sky-300: hsl(199.4 95.5% 73.9%);
+  --sky-400: hsl(198.4 93.2% 59.6%);
+  --sky-500: hsl(198.6 88.7% 48.4%);
+  --sky-600: hsl(200.4 98% 39.4%);
+  --sky-700: hsl(201.3 96.3% 32.2%);
+  --sky-800: hsl(201 90% 27.5%);
+  --sky-900: hsl(202 80.3% 23.9%);
+  --sky-950: hsl(204 80.2% 15.9%);
+
+  /* Blue */
+  --blue-50: hsl(213.8 100% 96.9%);
+  --blue-100: hsl(214.3 94.6% 92.7%);
+  --blue-200: hsl(213.3 96.9% 87.3%);
+  --blue-300: hsl(211.7 96.4% 78.4%);
+  --blue-400: hsl(213.1 93.9% 67.8%);
+  --blue-500: hsl(217.2 91.2% 59.8%);
+  --blue-600: hsl(221.2 83.2% 53.3%);
+  --blue-700: hsl(224.3 76.3% 48%);
+  --blue-800: hsl(225.9 70.7% 40.2%);
+  --blue-900: hsl(224.4 64.3% 32.9%);
+  --blue-950: hsl(226.2 57% 21%);
+
+  /* Indigo */
+  --indigo-50: hsl(225.9 100% 96.7%);
+  --indigo-100: hsl(226.5 100% 93.9%);
+  --indigo-200: hsl(228 96.5% 88.8%);
+  --indigo-300: hsl(229.7 93.5% 81.8%);
+  --indigo-400: hsl(234.5 89.5% 73.9%);
+  --indigo-500: hsl(238.7 83.5% 66.7%);
+  --indigo-600: hsl(243.4 75.4% 58.6%);
+  --indigo-700: hsl(244.5 57.9% 50.6%);
+  --indigo-800: hsl(243.7 54.5% 41.4%);
+  --indigo-900: hsl(242.2 47.4% 34.3%);
+  --indigo-950: hsl(243.8 47.1% 20%);
+
+  /* Violet */
+  --violet-50: hsl(250 100% 97.6%);
+  --violet-100: hsl(251.4 91.3% 95.5%);
+  --violet-200: hsl(250.5 95.2% 91.8%);
+  --violet-300: hsl(252.5 94.7% 85.1%);
+  --violet-400: hsl(255.1 91.7% 76.3%);
+  --violet-500: hsl(258.3 89.5% 66.3%);
+  --violet-600: hsl(262.1 83.3% 57.8%);
+  --violet-700: hsl(263.4 70% 50.4%);
+  --violet-800: hsl(263.4 69.3% 42.2%);
+  --violet-900: hsl(263.5 67.4% 34.9%);
+  --violet-950: hsl(261.2 72.6% 22.9%);
+
+  /* Purple */
+  --purple-50: hsl(270 100% 98%);
+  --purple-100: hsl(268.7 100% 95.5%);
+  --purple-200: hsl(268.6 100% 91.8%);
+  --purple-300: hsl(269.2 97.4% 85.1%);
+  --purple-400: hsl(270 95.2% 75.3%);
+  --purple-500: hsl(270.7 91% 65.1%);
+  --purple-600: hsl(271.5 81.3% 55.9%);
+  --purple-700: hsl(272.1 71.7% 47.1%);
+  --purple-800: hsl(272.9 67.2% 39.4%);
+  --purple-900: hsl(273.6 65.6% 32%);
+  --purple-950: hsl(273.5 86.9% 21%);
+
+  /* Fuchsia */
+  --fuchsia-50: hsl(289.1 100% 97.8%);
+  --fuchsia-100: hsl(287 100% 95.5%);
+  --fuchsia-200: hsl(288.3 95.8% 90.6%);
+  --fuchsia-300: hsl(291.1 93.1% 82.9%);
+  --fuchsia-400: hsl(292 91.4% 72.5%);
+  --fuchsia-500: hsl(292.2 84.1% 60.6%);
+  --fuchsia-600: hsl(293.4 69.5% 48.8%);
+  --fuchsia-700: hsl(294.7 72.4% 39.8%);
+  --fuchsia-800: hsl(295.4 70.2% 32.9%);
+  --fuchsia-900: hsl(296.7 63.6% 28%);
+  --fuchsia-950: hsl(296.8 90.2% 16.1%);
+
+  /* Pink */
+  --pink-50: hsl(327.3 73.3% 97.1%);
+  --pink-100: hsl(325.7 77.8% 94.7%);
+  --pink-200: hsl(325.9 84.6% 89.8%);
+  --pink-300: hsl(327.4 87.1% 81.8%);
+  --pink-400: hsl(328.6 85.5% 70.2%);
+  --pink-500: hsl(330.4 81.2% 60.4%);
+  --pink-600: hsl(333.3 71.4% 50.6%);
+  --pink-700: hsl(335.1 77.6% 42%);
+  --pink-800: hsl(335.8 74.4% 35.3%);
+  --pink-900: hsl(335.9 69% 30.4%);
+  --pink-950: hsl(336.2 83.9% 17.1%);
+
+  /* Rose */
+  --rose-50: hsl(355.7 100% 97.3%);
+  --rose-100: hsl(355.6 100% 94.7%);
+  --rose-200: hsl(352.7 96.1% 90%);
+  --rose-300: hsl(352.6 95.7% 81.8%);
+  --rose-400: hsl(351.3 94.5% 71.4%);
+  --rose-500: hsl(349.7 89.2% 60.2%);
+  --rose-600: hsl(346.8 77.2% 49.8%);
+  --rose-700: hsl(345.3 82.7% 40.8%);
+  --rose-800: hsl(343.4 79.7% 34.7%);
+  --rose-900: hsl(341.5 75.5% 30.4%);
+  --rose-950: hsl(343.1 87.7% 15.9%);
+}
+
+
+
+:root {
+  --hardware-pixel: 1px;
+}
+
+@media (min-resolution: 2dppx) {
+  :root {
+    --hardware-pixel: 0.5px;
+  }
+}
+
+@media (min-resolution: 3dppx) {
+  :root {
+    --hardware-pixel: 0.33333px;
+  }
+}
+
+@media (min-resolution: 4dppx) {
+  :root {
+    --hardware-pixel: 0.25px;
+  }
+}
+
+:root {
+  font-size: 12px;
+  --spacing-small: 3px;
+  --spacing-medium: 6px;
+  --spacing-large: 12px;
+  --spacing-x-large: 24px;
+}
+
+select {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+com-native-menu, button, select {
+  user-select: none;
+  white-space: nowrap;
+  padding: var(--spacing-small) var(--spacing-medium);
+  border-radius: 10px;
+  border-width: calc(2 * var(--hardware-pixel));
+  border-style: solid;
+  cursor: pointer;
+  border-color: var(--theme-control-border);
+  background-color: var(--theme-control-bg);
+  color: inherit;
+}
+
+com-native-menu {
+  /* for specificity */
+  /* No padding for this as we have a transparent
+  control below that needs to be clickable
+  even on the padding */
+  padding: 0;
+}
+
+com-native-menu:hover,
+select:hover,
+button:hover {
+  background-color: var(--theme-control-bg-hover);
+}
+
+com-native-menu[disabled], select[disabled], button[disabled] {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:has(> svg) {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-medium);
+}
+
+button:has(> svg) > * {
+  display: flex;
+}
+
+com-native-menu:focus-within,
+button:focus-visible,
+select:focus-visible {
+  background-color: var(--theme-control-bg-hover);
+  outline-style: solid;
+  outline-width: calc(3 * var(--hardware-pixel));
+  outline-color: var(--theme-control-border-focus);
+  z-index: 1;
+}
+
+/* Doesn't look good on Firefox - let's put it on the <p> */
+  [contenteditable].firefox:focus-visible {
+    outline-style: none;
+  }
+
+  p:has([contenteditable].firefox:focus-visible) {
+    outline-style: auto;
+  }
+/* -- */
+
+[tooltip] {
+  position: relative;
+}
+
+[tooltip]:not(:hover)::after {
+  opacity: 0;
+  transition-property: opacity;
+  transition-duration: 0s;
+  transition-delay: 0s;
+}
+
+[tooltip]:hover::after {
+  transition-delay: 500ms;
+}
+
+[tooltip]::after {
+  z-index: 4;
+  left: 50%;
+  bottom: -3px;
+  transform: translateX(-50%) translateY(100%);
+
+  content: attr(tooltip);
+  position: absolute;
+  text-align: center;
+  padding: var(--spacing-small) var(--spacing-medium);
+  min-width: 80px;
+  width: max-content;
+  max-width: 120px;
+  max-height: 120px;
+  overflow: hidden;
+  text-wrap: auto;
+  border-radius: 10px;
+  pointer-events: none;
+
+  opacity: 0.8;
+
+  background-color: light-dark(var(--neutral-950), var(--neutral-50));
+  color: light-dark(var(--neutral-50), var(--neutral-950));
+}
+
+[tooltip].tooltip-prevent-right-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(100%);
+}
+
+[tooltip].tooltip-prevent-bottom-edge::after {
+  transform: translateX(-50%) translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-left-and-bottom-edge::after {
+  right: unset;
+  left: 0%;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-right-and-bottom-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+    html {
+      overscroll-behavior: none;
+    }
+
+    * {
+      user-select: none;
+    }
+
+    /* font size set to 12px in controls.css */
+
+    html[font_size="large"] {
+      font-size: 14px;
+    }
+
+    html[font_size="verylarge"] {
+      font-size: 16px;
+    }
+
+    html[dockmode="popup"][popup_size="small"], html[dockmode="popup"][popup_size="small"] > body {
+      width: 480px;
+      height: 320px;
+    }
+
+    html[dockmode="popup"][popup_size="medium"], html[dockmode="popup"][popup_size="medium"] > body {
+      width: 480px;
+      height: 460px;
+    }
+
+    html[dockmode="popup"][popup_size="big"], html[dockmode="popup"][popup_size="big"] > body {
+      width: 480px;
+      height: 600px; /* Popup can't be bigger */
+    }
+
+    body {
+      width: 100%;
+      flex-flow: column;
+      flex-grow: 1;
+    }
+
+    #main, #settings {
+      overflow-y: auto;
+    }
+
+
+/* Hidden elements (see head) */
+</style>
+  
+<style id="premium-global">
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --premium-bg:       hsl(225 25% 5%);
+  --premium-surface:  hsl(225 22% 8%);
+  --premium-border:   hsl(225 30% 18%);
+  --premium-border-hi: hsl(250 75% 50% / 0.3);
+  --premium-accent:   hsl(250 85% 65%);
+  --premium-accent2:  hsl(180 85% 55%);
+  --premium-glow:     hsl(250 85% 60% / 0.3);
+  --premium-text:     hsl(220 15% 88%);
+  --premium-text-dim: hsl(220 10% 55%);
+}
+
+body {
+  --theme-box-bg:             hsl(225 22% 8%) !important;
+  --theme-box-border:         hsl(225 28% 16%) !important;
+  --theme-box-shadow:         0 4px 24px hsl(0 0% 0% / 0.4) !important;
+  --theme-control-bg:         hsl(225 24% 10%) !important;
+  --theme-control-bg-hover:   hsl(250 45% 16%) !important;
+  --theme-control-border:     hsl(225 26% 18%) !important;
+  --theme-control-border-focus: hsl(250 85% 65%) !important;
+  --theme-colored-fg:         hsl(220 15% 95%) !important;
+  --theme-dismiss:            hsl(220 10% 42%) !important;
+  --theme-dismiss-hover:      hsl(220 10% 65%) !important;
+  --theme-progressbar-border: hsl(250 85% 50%) !important;
+  --theme-progressbar-bg:     hsl(250 85% 58%) !important;
+  --theme-progressbar-fg:     hsl(220 15% 90%) !important;
+  --theme-selection:          hsl(250 50% 28%) !important;
+  --theme-outline-focus:      hsl(250 85% 65%) !important;
+  background-color: var(--premium-bg) !important;
+  color: var(--premium-text) !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  scrollbar-color: hsl(250 50% 30%) hsl(225 20% 8%) !important;
+}
+
+/* Scrollbar */
+* { scrollbar-width: thin; scrollbar-color: hsl(250 50% 30%) hsl(225 20% 8%); }
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: hsl(250 50% 28%); border-radius: 10px; }
+*::-webkit-scrollbar-thumb:hover { background: hsl(250 55% 38%); }
+
+/* Background */
+html, body {
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% -5%, hsl(250 80% 20% / 0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 85% 110%, hsl(180 70% 20% / 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, hsl(225 40% 12% / 0.3) 0%, transparent 70%) !important;
+}
+
+/* Cards / Roundedbox */
+.roundedbox {
+  background: linear-gradient(145deg, hsl(225 24% 9% / 0.95), hsl(230 22% 7% / 0.95)) !important;
+  border-color: var(--premium-border-hi) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 16px hsl(0 0% 0% / 0.35), 0 0 0 1px hsl(250 60% 60% / 0.04) inset !important;
+  backdrop-filter: blur(16px) saturate(1.2);
+  transition: border-color 200ms ease, box-shadow 200ms ease !important;
+}
+.roundedbox:hover {
+  border-color: hsl(250 70% 50% / 0.4) !important;
+  box-shadow: 0 4px 24px hsl(0 0% 0% / 0.4), 0 0 0 1px hsl(250 60% 60% / 0.08) inset, 0 0 30px hsl(250 80% 50% / 0.05) !important;
+}
+
+/* Buttons */
+button, com-native-menu, select {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  background: hsl(225 22% 11%) !important;
+  border-color: hsl(225 25% 18%) !important;
+  color: var(--premium-text) !important;
+  box-shadow: 0 1px 3px hsl(0 0% 0% / 0.2), 0 1px 0 hsl(250 60% 60% / 0.04) inset !important;
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+button:hover, com-native-menu:hover, select:hover {
+  background: hsl(250 40% 18%) !important;
+  border-color: hsl(250 65% 45% / 0.45) !important;
+  color: hsl(220 15% 96%) !important;
+  box-shadow: 0 2px 8px hsl(0 0% 0% / 0.3), 0 0 16px hsl(250 80% 50% / 0.08), 0 1px 0 hsl(250 60% 60% / 0.1) inset !important;
+  transform: translateY(-1px) !important;
+}
+
+button:active {
+  transform: translateY(0px) scale(0.98) !important;
+  transition-duration: 50ms !important;
+}
+
+button:disabled, com-native-menu[disabled], select[disabled] {
+  opacity: 0.35 !important;
+  pointer-events: none !important;
+}
+
+/* Headings */
+h2 {
+  font-weight: 600 !important;
+  font-size: 1.05rem !important;
+  color: hsl(220 15% 92%) !important;
+  letter-spacing: -0.01em !important;
+  margin-bottom: 2px !important;
+}
+
+h3 {
+  font-weight: 600 !important;
+  font-size: 0.92rem !important;
+  color: hsl(220 12% 80%) !important;
+  letter-spacing: -0.005em !important;
+  margin-top: 8px !important;
+}
+
+/* Labels & text */
+label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 4px 0 !important;
+  cursor: pointer !important;
+  transition: color 150ms ease !important;
+  border-radius: 6px !important;
+}
+label:hover {
+  color: hsl(220 15% 96%) !important;
+}
+label span {
+  font-size: 0.88rem !important;
+}
+
+p {
+  font-size: 0.85rem !important;
+  line-height: 1.6 !important;
+  color: var(--premium-text-dim) !important;
+}
+
+/* Form inputs */
+input[type="checkbox"], input[type="radio"] {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  border: 1.5px solid hsl(225 25% 25%) !important;
+  border-radius: 4px !important;
+  background: hsl(225 22% 10%) !important;
+  cursor: pointer !important;
+  transition: all 150ms ease !important;
+  position: relative !important;
+  vertical-align: middle !important;
+}
+
+input[type="radio"] {
+  border-radius: 50% !important;
+}
+
+input[type="checkbox"]:checked {
+  background: hsl(250 80% 58%) !important;
+  border-color: hsl(250 80% 58%) !important;
+  box-shadow: 0 0 8px hsl(250 80% 58% / 0.3) !important;
+}
+input[type="checkbox"]:checked::after {
+  content: '' !important;
+  position: absolute !important;
+  left: 4px !important;
+  top: 1px !important;
+  width: 5px !important;
+  height: 9px !important;
+  border: solid white !important;
+  border-width: 0 2px 2px 0 !important;
+  transform: rotate(45deg) !important;
+}
+
+input[type="radio"]:checked {
+  border-color: hsl(250 80% 58%) !important;
+  box-shadow: inset 0 0 0 3px hsl(250 80% 58%), 0 0 8px hsl(250 80% 58% / 0.3) !important;
+}
+
+input[type="number"], input[type="string"] {
+  background: hsl(225 20% 10%) !important;
+  border: 1.5px solid hsl(225 25% 20%) !important;
+  border-radius: 6px !important;
+  color: var(--premium-text) !important;
+  padding: 5px 8px !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+  font-size: 0.85rem !important;
+  width: 60px !important;
+  transition: border-color 150ms ease, box-shadow 150ms ease !important;
+  outline: none !important;
+}
+input[type="number"]:focus, input[type="string"]:focus {
+  border-color: hsl(250 80% 58%) !important;
+  box-shadow: 0 0 0 2px hsl(250 80% 58% / 0.15), 0 0 12px hsl(250 80% 58% / 0.08) !important;
+}
+
+/* Loading state */
+#loading {
+  gap: 12px !important;
+  padding: 24px !important;
+}
+#loading img {
+  width: 48px !important;
+  height: 48px !important;
+  opacity: 0.6 !important;
+  animation: hitif-pulse 2s ease-in-out infinite !important;
+}
+@keyframes hitif-pulse {
+  0%, 100% { opacity: 0.4; transform: scale(0.95); }
+  50% { opacity: 0.7; transform: scale(1); }
+}
+#loading p {
+  color: var(--premium-text-dim) !important;
+  font-size: 0.85rem !important;
+  animation: hitif-fade 2.5s ease-in-out infinite !important;
+}
+@keyframes hitif-fade {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+}
+
+/* No media box */
+#nomedia {
+  padding: 16px !important;
+}
+#nomedia_title {
+  font-weight: 600 !important;
+  color: hsl(220 15% 90%) !important;
+  font-size: 0.95rem !important;
+}
+
+/* Toolbar */
+#toolbar {
+  padding: 2px 6px !important;
+  gap: 2px !important;
+  border-bottom: 1px solid hsl(225 25% 15%) !important;
+  background: hsl(225 22% 7% / 0.6) !important;
+  backdrop-filter: blur(12px) !important;
+}
+#toolbar button {
+  padding: 6px 8px !important;
+  border-radius: 8px !important;
+}
+#toolbar button svg {
+  opacity: 0.7 !important;
+  transition: opacity 150ms ease !important;
+}
+#toolbar button:hover svg {
+  opacity: 1 !important;
+}
+
+/* Downloaded section */
+#downloaded {
+  padding: 4px 0 !important;
+}
+
+/* Transient history buttons */
+.transient_history_button {
+  font-size: 0.8rem !important;
+  padding: 4px 12px !important;
+  border-radius: 6px !important;
+}
+
+/* Notifications */
+#rm_notifications_all {
+  font-size: 0.78rem !important;
+  padding: 3px 10px !important;
+}
+
+/* Settings toolbar */
+#settings-toolbar {
+  padding: 2px 6px !important;
+  border-bottom: 1px solid hsl(225 25% 15%) !important;
+  background: hsl(225 22% 7% / 0.6) !important;
+  backdrop-filter: blur(12px) !important;
+}
+
+/* Version display */
+#span_version {
+  font-family: 'Inter', system-ui, sans-serif !important;
+  font-weight: 600 !important;
+  color: var(--premium-accent) !important;
+  font-size: 1rem !important;
+}
+
+/* Tooltip */
+[tooltip]::after {
+  background: hsl(225 22% 11%) !important;
+  border: 1px solid hsl(225 25% 20%) !important;
+  color: var(--premium-text) !important;
+  border-radius: 6px !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+  font-size: 0.75rem !important;
+  box-shadow: 0 4px 16px hsl(0 0% 0% / 0.4) !important;
+  padding: 4px 8px !important;
+}
+
+/* Box spacing */
+#box_main > vbox, #settings #box_main > vbox {
+  margin: 4px 8px !important;
+}
+#box_main > vbox > .roundedbox, #settings #box_main > vbox > .roundedbox {
+  padding: 12px !important;
+}
+
+/* Section headers with icon alignment */
+hbox[xalign="start"] p, vbox[xalign="start"] p {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+hbox[xalign="start"] p svg, vbox[xalign="start"] p svg {
+  flex-shrink: 0 !important;
+  opacity: 0.7 !important;
+}
+
+/* Button inside roundedbox (settings) */
+.roundedbox button:not(#button_back):not(#button_copy):not(#button_browser_download_dir):not(#button_saveas):not(#button_set_incognito):not(#button_smartnaming):not(#button_restart):not(#button_reset):not(#button_leave_review) {
+  font-size: 0.82rem !important;
+  padding: 5px 12px !important;
+}
+
+/* Action buttons (more prominent) */
+#button_restart, #button_reset, #button_browser_download_dir, #button_smartnaming {
+  background: hsl(225 24% 12%) !important;
+  border-color: hsl(225 28% 22%) !important;
+  padding: 7px 14px !important;
+  font-size: 0.85rem !important;
+  border-radius: 8px !important;
+}
+#button_restart:hover, #button_reset:hover, #button_browser_download_dir:hover, #button_smartnaming:hover {
+  background: hsl(250 40% 18%) !important;
+  border-color: hsl(250 65% 45% / 0.4) !important;
+}
+
+/* Version title */
+.version_title, h2[data-i18n="version_title"] + p {
+  margin-bottom: 4px !important;
+}
+
+/* Span inside buttons */
+button span {
+  font-size: 0.85rem !important;
+}
+
+/* Focus visible ring improvement */
+button:focus-visible, select:focus-visible {
+  outline: 2px solid hsl(250 80% 58%) !important;
+  outline-offset: 1px !important;
+}
+
+/* Downloaded container spacing */
+#downloaded_container {
+  gap: 2px !important;
+}
+</style>
+
+
+
+</head>
+
+  <body>
+    <vbox id="history_disabled" flex="1" pack="center" xalign="center" hidden="true">
+      <p>L'historique des téléchargements est actuellement désactivé.</p>
+      <spacer flex="1"></spacer>
+      <button id="button_enable_history">Activer l'historique</button>
+      <spacer flex="1"></spacer>
+    </vbox>
+
+    <vbox id="history_empty" flex="1" pack="center" xalign="center" hidden="true">
+      <p>Aucun téléchargement dans l'historique.</p>
+    </vbox>
+
+    <vbox id="history_controls" hidden="true">
+      <hbox>
+        <button id="button_disable_history">Désactiver</button>
+        <button id="button_clear_history">Effacer l'historique</button>
+        <input id="input_filter" type="text" placeholder="Filtrer..." flex="1">
+      </hbox>
+    </vbox>
+
+    <vbox id="downloaded_container" flex="1" hidden="true" style="overflow-y: auto;"></vbox>
+
+    <template id="native-menu-template">
+  <style>
+
+  :root[theme="system"] {
+  color-scheme: light dark;
+}
+
+:root[theme="dark"] {
+  color-scheme: dark;
+}
+
+:root[theme="light"] {
+  color-scheme: light;
+}
+
+body {
+  scrollbar-color: light-dark(var(--violet-300) var(--neutral-50), var(--violet-900) var(--neutral-300));
+  color: light-dark(var(--neutral-700), var(--neutral-200));
+  background-color: light-dark(hsl(230 20% 97%), hsl(235 20% 12%));
+  --theme-selection: light-dark(var(--violet-200), var(--violet-800));
+  --theme-outline-focus: light-dark(var(--neutral-200), var(--neutral-800));
+  --theme-control-bg: light-dark(hsl(230 10% 96%), hsl(235 12% 18%));
+  --theme-control-bg-hover: light-dark(hsl(230 15% 94%), hsl(235 15% 22%));
+  --theme-control-border: light-dark(hsl(230 10% 85%), hsl(235 10% 24%));
+  --theme-control-border-focus: light-dark(var(--neutral-800), var(--neutral-200));
+  --theme-colored-fg: light-dark(var(--neutral-100), var(--neutral-900));
+  --theme-dismiss: light-dark(var(--neutral-500), var(--neutral-500));
+  --theme-dismiss-hover: light-dark(var(--neutral-600), var(--neutral-400));
+  --theme-box-bg: light-dark(hsl(230 15% 98%), hsl(235 15% 15%));
+  --theme-box-border: light-dark(hsl(230 10% 88%), hsl(235 12% 20%));
+  --theme-box-shadow: light-dark(hsl(230 30% 50% / 8%), rgb(0 0 0 / 35%));
+  --theme-progressbar-border: light-dark(var(--violet-500), var(--violet-900));
+  --theme-progressbar-bg: light-dark(var(--violet-300), var(--violet-600));
+  --theme-progressbar-fg: light-dark(var(--neutral-700), var(--neutral-300));
+}
+  *, *::before, *::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+body {
+  line-height: 1.5;
+  text-size-adjust: none;
+  font-size: 1rem;
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  -webkit-font-smoothing: antialiased;
+  font-family: system-ui, sans-serif;
+}
+
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+
+a {
+  text-decoration-skip-ink: auto;
+  color: currentColor;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+}
+
+box, hbox, vbox, spacer, stack {
+  flex-shrink: 0;
+  display: flex;
+  /*
+    These are necessary really.
+    Otherwise set to min-*: auto, messing up flex logic.
+  */
+  min-height: 0;
+  min-width: 0;
+}
+
+hbox {
+  flex-flow: row;
+  text-overflow: ellipsis;
+}
+
+wrappable-text {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+vbox {
+  flex-flow: column;
+  /* Not sure why I had that at some point… */
+  /* width: 100%; */
+}
+
+stack {
+  position: relative;
+  overflow: hidden;
+}
+
+stack > * {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+[wrap] { flex-wrap: wrap }
+[stretch] { align-self: stretch }
+[hidden="true"] { display: none!important; }
+
+[flex] { display: flex }
+[flex="1"] { flex-grow: 1 }
+[flex="2"] { flex-grow: 2 }
+[flex="3"] { flex-grow: 3 }
+[flex="4"] { flex-grow: 4 }
+[flex="5"] { flex-grow: 5 }
+[flex="6"] { flex-grow: 6 }
+[flex="7"] { flex-grow: 7 }
+[flex="8"] { flex-grow: 8 }
+[flex="9"] { flex-grow: 9 }
+
+/* We don't use the align=… attribute. Browser engines map that into a text-align=center!!! */
+[xalign="start"] { align-items: flex-start }
+[xalign="center"] { align-items: center }
+[xalign="end"] { align-items: flex-end }
+[xalign="baseline"] { align-items: flex-baseline }
+[xalign="stretch"] { align-items: stretch }
+
+[pack="start"] { justify-content: flex-start }
+[pack="center"] { justify-content: center }
+[pack="end"] { justify-content: flex-end }
+
+/* DEBUG */
+
+[debug] hbox,
+[debug] vbox,
+[debug] box,
+[debug] spacer {
+  margin: 8px;
+  padding: 8px;
+  outline: 1px dashed black;
+  position: relative;
+}
+
+/* [debug] hbox { background: green; } */
+/* [debug] vbox { background: blue; } */
+/* [debug] spacer { background: yellow; } */
+/* [debug] box { background: orange; } */
+
+[debug] hbox:before,
+[debug] vbox:before,
+[debug] box:before {
+  position: absolute;
+  font-size: 6px;
+  top: 0; left: 0;
+  display: block;
+  content: attr(id);
+}
+
+/* From https://github.com/shadcn-ui/ui/issues/669 */
+
+/* Palette: https://tailwindcss.com/docs/customizing-colors */
+
+:root {
+  /* Slate */
+  --slate-50: hsl(210 40% 98%);
+  --slate-100: hsl(210 40% 96.1%);
+  --slate-200: hsl(214.3 31.8% 91.4%);
+  --slate-300: hsl(212.7 26.8% 83.9%);
+  --slate-400: hsl(215 20.2% 65.1%);
+  --slate-500: hsl(215.4 16.3% 46.9%);
+  --slate-600: hsl(215.3 19.3% 34.5%);
+  --slate-700: hsl(215.3 25% 26.7%);
+  --slate-800: hsl(217.2 32.6% 17.5%);
+  --slate-900: hsl(222.2 47.4% 11.2%);
+  --slate-950: hsl(228.6 84% 4.9%);
+
+  /* Gray */
+  --gray-50: hsl(210 20% 98%);
+  --gray-100: hsl(220 14.3% 95.9%);
+  --gray-200: hsl(220 13% 91%);
+  --gray-300: hsl(216 12.2% 83.9%);
+  --gray-400: hsl(217.9 10.6% 64.9%);
+  --gray-500: hsl(220 8.9% 46.1%);
+  --gray-600: hsl(215 13.8% 34.1%);
+  --gray-700: hsl(216.9 19.1% 26.7%);
+  --gray-800: hsl(215 27.9% 16.9%);
+  --gray-900: hsl(220.9 39.3% 11%);
+  --gray-950: hsl(224 71.4% 4.1%);
+
+  /* Zinc */
+  --zinc-50: hsl(0 0% 98%);
+  --zinc-100: hsl(240 4.8% 95.9%);
+  --zinc-200: hsl(240 5.9% 90%);
+  --zinc-300: hsl(240 4.9% 83.9%);
+  --zinc-400: hsl(240 5% 64.9%);
+  --zinc-500: hsl(240 3.8% 46.1%);
+  --zinc-600: hsl(240 5.2% 33.9%);
+  --zinc-700: hsl(240 5.3% 26.1%);
+  --zinc-800: hsl(240 3.7% 15.9%);
+  --zinc-900: hsl(240 5.9% 10%);
+  --zinc-950: hsl(240 10% 3.9%);
+
+  /* Neutral */
+  --neutral-50: hsl(0 0% 98%);
+  --neutral-100: hsl(0 0% 96.1%);
+  --neutral-200: hsl(0 0% 89.8%);
+  --neutral-300: hsl(0 0% 83.1%);
+  --neutral-400: hsl(0 0% 63.9%);
+  --neutral-500: hsl(0 0% 45.1%);
+  --neutral-600: hsl(0 0% 32.2%);
+  --neutral-700: hsl(0 0% 25.1%);
+  --neutral-800: hsl(0 0% 14.9%);
+  --neutral-900: hsl(0 0% 9%);
+  --neutral-950: hsl(0 0% 3.9%);
+
+  /* Stone */
+  --stone-50: hsl(60 9.1% 97.8%);
+  --stone-100: hsl(60 4.8% 95.9%);
+  --stone-200: hsl(20 5.9% 90%);
+  --stone-300: hsl(24 5.7% 82.9%);
+  --stone-400: hsl(24 5.4% 63.9%);
+  --stone-500: hsl(25 5.3% 44.7%);
+  --stone-600: hsl(33.3 5.5% 32.4%);
+  --stone-700: hsl(30 6.3% 25.1%);
+  --stone-800: hsl(12 6.5% 15.1%);
+  --stone-900: hsl(24 9.8% 10%);
+  --stone-950: hsl(20 14.3% 4.1%);
+
+  /* Red */
+  --red-50: hsl(0 85.7% 97.3%);
+  --red-100: hsl(0 93.3% 94.1%);
+  --red-200: hsl(0 96.3% 89.4%);
+  --red-300: hsl(0 93.5% 81.8%);
+  --red-400: hsl(0 90.6% 70.8%);
+  --red-500: hsl(0 84.2% 60.2%);
+  --red-600: hsl(0 72.2% 50.6%);
+  --red-700: hsl(0 73.7% 41.8%);
+  --red-800: hsl(0 70% 35.3%);
+  --red-900: hsl(0 62.8% 30.6%);
+  --red-950: hsl(0 74.7% 15.5%);
+
+  /* Orange */
+  --orange-50: hsl(33.3 100% 96.5%);
+  --orange-100: hsl(34.3 100% 91.8%);
+  --orange-200: hsl(32.1 97.7% 83.1%);
+  --orange-300: hsl(30.7 97.2% 72.4%);
+  --orange-400: hsl(27 96% 61%);
+  --orange-500: hsl(24.6 95% 53.1%);
+  --orange-600: hsl(20.5 90.2% 48.2%);
+  --orange-700: hsl(17.5 88.3% 40.4%);
+  --orange-800: hsl(15 79.1% 33.7%);
+  --orange-900: hsl(15.3 74.6% 27.8%);
+  --orange-950: hsl(13 81.1% 14.5%);
+
+  /* Amber */
+  --amber-50: hsl(48 100% 96.1%);
+  --amber-100: hsl(48 96.5% 88.8%);
+  --amber-200: hsl(48 96.6% 76.7%);
+  --amber-300: hsl(45.9 96.7% 64.5%);
+  --amber-400: hsl(43.3 96.4% 56.3%);
+  --amber-500: hsl(37.7 92.1% 50.2%);
+  --amber-600: hsl(32.1 94.6% 43.7%);
+  --amber-700: hsl(26 90.5% 37.1%);
+  --amber-800: hsl(22.7 82.5% 31.4%);
+  --amber-900: hsl(21.7 77.8% 26.5%);
+  --amber-950: hsl(20.9 91.7% 14.1%);
+
+  /* Yellow */
+  --yellow-50: hsl(54.5 91.7% 95.3%);
+  --yellow-100: hsl(54.9 96.7% 88%);
+  --yellow-200: hsl(52.8 98.3% 76.9%);
+  --yellow-300: hsl(50.4 97.8% 63.5%);
+  --yellow-400: hsl(47.9 95.8% 53.1%);
+  --yellow-500: hsl(45.4 93.4% 47.5%);
+  --yellow-600: hsl(40.6 96.1% 40.4%);
+  --yellow-700: hsl(35.5 91.7% 32.9%);
+  --yellow-800: hsl(31.8 81% 28.8%);
+  --yellow-900: hsl(28.4 72.5% 25.7%);
+  --yellow-950: hsl(26 83.3% 14.1%);
+
+  /* Lime */
+  --lime-50: hsl(78.3 92% 95.1%);
+  --lime-100: hsl(79.6 89.1% 89.2%);
+  --lime-200: hsl(80.9 88.5% 79.6%);
+  --lime-300: hsl(82 84.5% 67.1%);
+  --lime-400: hsl(82.7 78% 55.5%);
+  --lime-500: hsl(83.7 80.5% 44.3%);
+  --lime-600: hsl(84.8 85.2% 34.5%);
+  --lime-700: hsl(85.9 78.4% 27.3%);
+  --lime-800: hsl(86.3 69% 22.7%);
+  --lime-900: hsl(87.6 61.2% 20.2%);
+  --lime-950: hsl(89.3 80.4% 10%);
+
+  /* Green */
+  --green-50: hsl(138.5 76.5% 96.7%);
+  --green-100: hsl(140.6 84.2% 92.5%);
+  --green-200: hsl(141 78.9% 85.1%);
+  --green-300: hsl(141.7 76.6% 73.1%);
+  --green-400: hsl(141.9 69.2% 58%);
+  --green-500: hsl(142.1 70.6% 45.3%);
+  --green-600: hsl(142.1 76.2% 36.3%);
+  --green-700: hsl(142.4 71.8% 29.2%);
+  --green-800: hsl(142.8 64.2% 24.1%);
+  --green-900: hsl(143.8 61.2% 20.2%);
+  --green-950: hsl(144.9 80.4% 10%);
+
+  /* Emerald */
+  --emerald-50: hsl(151.8 81% 95.9%);
+  --emerald-100: hsl(149.3 80.4% 90%);
+  --emerald-200: hsl(152.4 76% 80.4%);
+  --emerald-300: hsl(156.2 71.6% 66.9%);
+  --emerald-400: hsl(158.1 64.4% 51.6%);
+  --emerald-500: hsl(160.1 84.1% 39.4%);
+  --emerald-600: hsl(161.4 93.5% 30.4%);
+  --emerald-700: hsl(162.9 93.5% 24.3%);
+  --emerald-800: hsl(163.1 88.1% 19.8%);
+  --emerald-900: hsl(164.2 85.7% 16.5%);
+  --emerald-950: hsl(165.7 91.3% 9%);
+
+  /* Teal */
+  --teal-50: hsl(166.2 76.5% 96.7%);
+  --teal-100: hsl(167.2 85.5% 89.2%);
+  --teal-200: hsl(168.4 83.8% 78.2%);
+  --teal-300: hsl(170.6 76.9% 64.3%);
+  --teal-400: hsl(172.5 66% 50.4%);
+  --teal-500: hsl(173.4 80.4% 40%);
+  --teal-600: hsl(174.7 83.9% 31.6%);
+  --teal-700: hsl(175.3 77.4% 26.1%);
+  --teal-800: hsl(176.1 69.4% 21.8%);
+  --teal-900: hsl(175.9 60.8% 19%);
+  --teal-950: hsl(178.6 84.3% 10%);
+
+  /* Cyan */
+  --cyan-50: hsl(183.2 100% 96.3%);
+  --cyan-100: hsl(185.1 95.9% 90.4%);
+  --cyan-200: hsl(186.2 93.5% 81.8%);
+  --cyan-300: hsl(187 92.4% 69%);
+  --cyan-400: hsl(187.9 85.7% 53.3%);
+  --cyan-500: hsl(188.7 94.5% 42.7%);
+  --cyan-600: hsl(191.6 91.4% 36.5%);
+  --cyan-700: hsl(192.9 82.3% 31%);
+  --cyan-800: hsl(194.4 69.6% 27.1%);
+  --cyan-900: hsl(196.4 63.6% 23.7%);
+  --cyan-950: hsl(197 78.9% 14.9%);
+
+  /* Sky */
+  --sky-50: hsl(204 100% 97.1%);
+  --sky-100: hsl(204 93.8% 93.7%);
+  --sky-200: hsl(200.6 94.4% 86.1%);
+  --sky-300: hsl(199.4 95.5% 73.9%);
+  --sky-400: hsl(198.4 93.2% 59.6%);
+  --sky-500: hsl(198.6 88.7% 48.4%);
+  --sky-600: hsl(200.4 98% 39.4%);
+  --sky-700: hsl(201.3 96.3% 32.2%);
+  --sky-800: hsl(201 90% 27.5%);
+  --sky-900: hsl(202 80.3% 23.9%);
+  --sky-950: hsl(204 80.2% 15.9%);
+
+  /* Blue */
+  --blue-50: hsl(213.8 100% 96.9%);
+  --blue-100: hsl(214.3 94.6% 92.7%);
+  --blue-200: hsl(213.3 96.9% 87.3%);
+  --blue-300: hsl(211.7 96.4% 78.4%);
+  --blue-400: hsl(213.1 93.9% 67.8%);
+  --blue-500: hsl(217.2 91.2% 59.8%);
+  --blue-600: hsl(221.2 83.2% 53.3%);
+  --blue-700: hsl(224.3 76.3% 48%);
+  --blue-800: hsl(225.9 70.7% 40.2%);
+  --blue-900: hsl(224.4 64.3% 32.9%);
+  --blue-950: hsl(226.2 57% 21%);
+
+  /* Indigo */
+  --indigo-50: hsl(225.9 100% 96.7%);
+  --indigo-100: hsl(226.5 100% 93.9%);
+  --indigo-200: hsl(228 96.5% 88.8%);
+  --indigo-300: hsl(229.7 93.5% 81.8%);
+  --indigo-400: hsl(234.5 89.5% 73.9%);
+  --indigo-500: hsl(238.7 83.5% 66.7%);
+  --indigo-600: hsl(243.4 75.4% 58.6%);
+  --indigo-700: hsl(244.5 57.9% 50.6%);
+  --indigo-800: hsl(243.7 54.5% 41.4%);
+  --indigo-900: hsl(242.2 47.4% 34.3%);
+  --indigo-950: hsl(243.8 47.1% 20%);
+
+  /* Violet */
+  --violet-50: hsl(250 100% 97.6%);
+  --violet-100: hsl(251.4 91.3% 95.5%);
+  --violet-200: hsl(250.5 95.2% 91.8%);
+  --violet-300: hsl(252.5 94.7% 85.1%);
+  --violet-400: hsl(255.1 91.7% 76.3%);
+  --violet-500: hsl(258.3 89.5% 66.3%);
+  --violet-600: hsl(262.1 83.3% 57.8%);
+  --violet-700: hsl(263.4 70% 50.4%);
+  --violet-800: hsl(263.4 69.3% 42.2%);
+  --violet-900: hsl(263.5 67.4% 34.9%);
+  --violet-950: hsl(261.2 72.6% 22.9%);
+
+  /* Purple */
+  --purple-50: hsl(270 100% 98%);
+  --purple-100: hsl(268.7 100% 95.5%);
+  --purple-200: hsl(268.6 100% 91.8%);
+  --purple-300: hsl(269.2 97.4% 85.1%);
+  --purple-400: hsl(270 95.2% 75.3%);
+  --purple-500: hsl(270.7 91% 65.1%);
+  --purple-600: hsl(271.5 81.3% 55.9%);
+  --purple-700: hsl(272.1 71.7% 47.1%);
+  --purple-800: hsl(272.9 67.2% 39.4%);
+  --purple-900: hsl(273.6 65.6% 32%);
+  --purple-950: hsl(273.5 86.9% 21%);
+
+  /* Fuchsia */
+  --fuchsia-50: hsl(289.1 100% 97.8%);
+  --fuchsia-100: hsl(287 100% 95.5%);
+  --fuchsia-200: hsl(288.3 95.8% 90.6%);
+  --fuchsia-300: hsl(291.1 93.1% 82.9%);
+  --fuchsia-400: hsl(292 91.4% 72.5%);
+  --fuchsia-500: hsl(292.2 84.1% 60.6%);
+  --fuchsia-600: hsl(293.4 69.5% 48.8%);
+  --fuchsia-700: hsl(294.7 72.4% 39.8%);
+  --fuchsia-800: hsl(295.4 70.2% 32.9%);
+  --fuchsia-900: hsl(296.7 63.6% 28%);
+  --fuchsia-950: hsl(296.8 90.2% 16.1%);
+
+  /* Pink */
+  --pink-50: hsl(327.3 73.3% 97.1%);
+  --pink-100: hsl(325.7 77.8% 94.7%);
+  --pink-200: hsl(325.9 84.6% 89.8%);
+  --pink-300: hsl(327.4 87.1% 81.8%);
+  --pink-400: hsl(328.6 85.5% 70.2%);
+  --pink-500: hsl(330.4 81.2% 60.4%);
+  --pink-600: hsl(333.3 71.4% 50.6%);
+  --pink-700: hsl(335.1 77.6% 42%);
+  --pink-800: hsl(335.8 74.4% 35.3%);
+  --pink-900: hsl(335.9 69% 30.4%);
+  --pink-950: hsl(336.2 83.9% 17.1%);
+
+  /* Rose */
+  --rose-50: hsl(355.7 100% 97.3%);
+  --rose-100: hsl(355.6 100% 94.7%);
+  --rose-200: hsl(352.7 96.1% 90%);
+  --rose-300: hsl(352.6 95.7% 81.8%);
+  --rose-400: hsl(351.3 94.5% 71.4%);
+  --rose-500: hsl(349.7 89.2% 60.2%);
+  --rose-600: hsl(346.8 77.2% 49.8%);
+  --rose-700: hsl(345.3 82.7% 40.8%);
+  --rose-800: hsl(343.4 79.7% 34.7%);
+  --rose-900: hsl(341.5 75.5% 30.4%);
+  --rose-950: hsl(343.1 87.7% 15.9%);
+}
+
+
+
+:root {
+  --hardware-pixel: 1px;
+}
+
+@media (min-resolution: 2dppx) {
+  :root {
+    --hardware-pixel: 0.5px;
+  }
+}
+
+@media (min-resolution: 3dppx) {
+  :root {
+    --hardware-pixel: 0.33333px;
+  }
+}
+
+@media (min-resolution: 4dppx) {
+  :root {
+    --hardware-pixel: 0.25px;
+  }
+}
+
+:root {
+  font-size: 12px;
+  --spacing-small: 3px;
+  --spacing-medium: 6px;
+  --spacing-large: 12px;
+  --spacing-x-large: 24px;
+}
+
+select {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+com-native-menu, button, select {
+  user-select: none;
+  white-space: nowrap;
+  padding: var(--spacing-small) var(--spacing-medium);
+  border-radius: 10px;
+  border-width: calc(2 * var(--hardware-pixel));
+  border-style: solid;
+  cursor: pointer;
+  border-color: var(--theme-control-border);
+  background-color: var(--theme-control-bg);
+  color: inherit;
+}
+
+com-native-menu {
+  /* for specificity */
+  /* No padding for this as we have a transparent
+  control below that needs to be clickable
+  even on the padding */
+  padding: 0;
+}
+
+com-native-menu:hover,
+select:hover,
+button:hover {
+  background-color: var(--theme-control-bg-hover);
+}
+
+com-native-menu[disabled], select[disabled], button[disabled] {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:has(> svg) {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-medium);
+}
+
+button:has(> svg) > * {
+  display: flex;
+}
+
+com-native-menu:focus-within,
+button:focus-visible,
+select:focus-visible {
+  background-color: var(--theme-control-bg-hover);
+  outline-style: solid;
+  outline-width: calc(3 * var(--hardware-pixel));
+  outline-color: var(--theme-control-border-focus);
+  z-index: 1;
+}
+
+/* Doesn't look good on Firefox - let's put it on the <p> */
+  [contenteditable].firefox:focus-visible {
+    outline-style: none;
+  }
+
+  p:has([contenteditable].firefox:focus-visible) {
+    outline-style: auto;
+  }
+/* -- */
+
+[tooltip] {
+  position: relative;
+}
+
+[tooltip]:not(:hover)::after {
+  opacity: 0;
+  transition-property: opacity;
+  transition-duration: 0s;
+  transition-delay: 0s;
+}
+
+[tooltip]:hover::after {
+  transition-delay: 500ms;
+}
+
+[tooltip]::after {
+  z-index: 4;
+  left: 50%;
+  bottom: -3px;
+  transform: translateX(-50%) translateY(100%);
+
+  content: attr(tooltip);
+  position: absolute;
+  text-align: center;
+  padding: var(--spacing-small) var(--spacing-medium);
+  min-width: 80px;
+  width: max-content;
+  max-width: 120px;
+  max-height: 120px;
+  overflow: hidden;
+  text-wrap: auto;
+  border-radius: 10px;
+  pointer-events: none;
+
+  opacity: 0.8;
+
+  background-color: light-dark(var(--neutral-950), var(--neutral-50));
+  color: light-dark(var(--neutral-50), var(--neutral-950));
+}
+
+[tooltip].tooltip-prevent-right-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(100%);
+}
+
+[tooltip].tooltip-prevent-bottom-edge::after {
+  transform: translateX(-50%) translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-left-and-bottom-edge::after {
+  right: unset;
+  left: 0%;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-right-and-bottom-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+  :host {
+    display: flex;
+    align-items: center;
+  }
+
+  #fake-select {
+    position: relative;
+    overflow: hidden;
+    padding: var(--spacing-small) var(--spacing-medium);
+    text-align: center;
+  }
+
+  #fake-select > svg {
+    display: block;
+    margin: 2px 2px 2px 1px;
+  }
+
+  #fake-select > select {
+    /* Chrome on Windows styles its selects */
+    /* No effect on Mac */
+    background-color: light-dark(var(--neutral-100), var(--neutral-800));
+    color: light-dark(var(--neutral-700), var(--neutral-200));
+
+    /* Font size could be picked up by native rendering */
+    font-size: initial;
+
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    opacity: 0;
+  }
+
+  
+#button_report_nomedia, #button_report, #button_reporting, #button_reported, #button_help, #button_show_translate {
+    display: none !important;
+}
+
+#box_account_not_linux, #p_leave_review {
+    display: none !important;
+}
+</style>
+  <vbox flex="1" xalign="stretch">
+    <div id="fake-select">
+      <slot name="face"></slot>
+      <select></select>
+    </div>
+  </vbox>
+</template>
+
+    <template id="button-dismiss-template">
+  <style>
+
+  *, *::before, *::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+body {
+  line-height: 1.5;
+  text-size-adjust: none;
+  font-size: 1rem;
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  -webkit-font-smoothing: antialiased;
+  font-family: system-ui, sans-serif;
+}
+
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+
+a {
+  text-decoration-skip-ink: auto;
+  color: currentColor;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+}
+
+box, hbox, vbox, spacer, stack {
+  flex-shrink: 0;
+  display: flex;
+  /*
+    These are necessary really.
+    Otherwise set to min-*: auto, messing up flex logic.
+  */
+  min-height: 0;
+  min-width: 0;
+}
+
+hbox {
+  flex-flow: row;
+  text-overflow: ellipsis;
+}
+
+wrappable-text {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+vbox {
+  flex-flow: column;
+  /* Not sure why I had that at some point… */
+  /* width: 100%; */
+}
+
+stack {
+  position: relative;
+  overflow: hidden;
+}
+
+stack > * {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+[wrap] { flex-wrap: wrap }
+[stretch] { align-self: stretch }
+[hidden="true"] { display: none!important; }
+
+[flex] { display: flex }
+[flex="1"] { flex-grow: 1 }
+[flex="2"] { flex-grow: 2 }
+[flex="3"] { flex-grow: 3 }
+[flex="4"] { flex-grow: 4 }
+[flex="5"] { flex-grow: 5 }
+[flex="6"] { flex-grow: 6 }
+[flex="7"] { flex-grow: 7 }
+[flex="8"] { flex-grow: 8 }
+[flex="9"] { flex-grow: 9 }
+
+/* We don't use the align=… attribute. Browser engines map that into a text-align=center!!! */
+[xalign="start"] { align-items: flex-start }
+[xalign="center"] { align-items: center }
+[xalign="end"] { align-items: flex-end }
+[xalign="baseline"] { align-items: flex-baseline }
+[xalign="stretch"] { align-items: stretch }
+
+[pack="start"] { justify-content: flex-start }
+[pack="center"] { justify-content: center }
+[pack="end"] { justify-content: flex-end }
+
+/* DEBUG */
+
+[debug] hbox,
+[debug] vbox,
+[debug] box,
+[debug] spacer {
+  margin: 8px;
+  padding: 8px;
+  outline: 1px dashed black;
+  position: relative;
+}
+
+/* [debug] hbox { background: green; } */
+/* [debug] vbox { background: blue; } */
+/* [debug] spacer { background: yellow; } */
+/* [debug] box { background: orange; } */
+
+[debug] hbox:before,
+[debug] vbox:before,
+[debug] box:before {
+  position: absolute;
+  font-size: 6px;
+  top: 0; left: 0;
+  display: block;
+  content: attr(id);
+}
+
+/* From https://github.com/shadcn-ui/ui/issues/669 */
+
+/* Palette: https://tailwindcss.com/docs/customizing-colors */
+
+:root {
+  /* Slate */
+  --slate-50: hsl(210 40% 98%);
+  --slate-100: hsl(210 40% 96.1%);
+  --slate-200: hsl(214.3 31.8% 91.4%);
+  --slate-300: hsl(212.7 26.8% 83.9%);
+  --slate-400: hsl(215 20.2% 65.1%);
+  --slate-500: hsl(215.4 16.3% 46.9%);
+  --slate-600: hsl(215.3 19.3% 34.5%);
+  --slate-700: hsl(215.3 25% 26.7%);
+  --slate-800: hsl(217.2 32.6% 17.5%);
+  --slate-900: hsl(222.2 47.4% 11.2%);
+  --slate-950: hsl(228.6 84% 4.9%);
+
+  /* Gray */
+  --gray-50: hsl(210 20% 98%);
+  --gray-100: hsl(220 14.3% 95.9%);
+  --gray-200: hsl(220 13% 91%);
+  --gray-300: hsl(216 12.2% 83.9%);
+  --gray-400: hsl(217.9 10.6% 64.9%);
+  --gray-500: hsl(220 8.9% 46.1%);
+  --gray-600: hsl(215 13.8% 34.1%);
+  --gray-700: hsl(216.9 19.1% 26.7%);
+  --gray-800: hsl(215 27.9% 16.9%);
+  --gray-900: hsl(220.9 39.3% 11%);
+  --gray-950: hsl(224 71.4% 4.1%);
+
+  /* Zinc */
+  --zinc-50: hsl(0 0% 98%);
+  --zinc-100: hsl(240 4.8% 95.9%);
+  --zinc-200: hsl(240 5.9% 90%);
+  --zinc-300: hsl(240 4.9% 83.9%);
+  --zinc-400: hsl(240 5% 64.9%);
+  --zinc-500: hsl(240 3.8% 46.1%);
+  --zinc-600: hsl(240 5.2% 33.9%);
+  --zinc-700: hsl(240 5.3% 26.1%);
+  --zinc-800: hsl(240 3.7% 15.9%);
+  --zinc-900: hsl(240 5.9% 10%);
+  --zinc-950: hsl(240 10% 3.9%);
+
+  /* Neutral */
+  --neutral-50: hsl(0 0% 98%);
+  --neutral-100: hsl(0 0% 96.1%);
+  --neutral-200: hsl(0 0% 89.8%);
+  --neutral-300: hsl(0 0% 83.1%);
+  --neutral-400: hsl(0 0% 63.9%);
+  --neutral-500: hsl(0 0% 45.1%);
+  --neutral-600: hsl(0 0% 32.2%);
+  --neutral-700: hsl(0 0% 25.1%);
+  --neutral-800: hsl(0 0% 14.9%);
+  --neutral-900: hsl(0 0% 9%);
+  --neutral-950: hsl(0 0% 3.9%);
+
+  /* Stone */
+  --stone-50: hsl(60 9.1% 97.8%);
+  --stone-100: hsl(60 4.8% 95.9%);
+  --stone-200: hsl(20 5.9% 90%);
+  --stone-300: hsl(24 5.7% 82.9%);
+  --stone-400: hsl(24 5.4% 63.9%);
+  --stone-500: hsl(25 5.3% 44.7%);
+  --stone-600: hsl(33.3 5.5% 32.4%);
+  --stone-700: hsl(30 6.3% 25.1%);
+  --stone-800: hsl(12 6.5% 15.1%);
+  --stone-900: hsl(24 9.8% 10%);
+  --stone-950: hsl(20 14.3% 4.1%);
+
+  /* Red */
+  --red-50: hsl(0 85.7% 97.3%);
+  --red-100: hsl(0 93.3% 94.1%);
+  --red-200: hsl(0 96.3% 89.4%);
+  --red-300: hsl(0 93.5% 81.8%);
+  --red-400: hsl(0 90.6% 70.8%);
+  --red-500: hsl(0 84.2% 60.2%);
+  --red-600: hsl(0 72.2% 50.6%);
+  --red-700: hsl(0 73.7% 41.8%);
+  --red-800: hsl(0 70% 35.3%);
+  --red-900: hsl(0 62.8% 30.6%);
+  --red-950: hsl(0 74.7% 15.5%);
+
+  /* Orange */
+  --orange-50: hsl(33.3 100% 96.5%);
+  --orange-100: hsl(34.3 100% 91.8%);
+  --orange-200: hsl(32.1 97.7% 83.1%);
+  --orange-300: hsl(30.7 97.2% 72.4%);
+  --orange-400: hsl(27 96% 61%);
+  --orange-500: hsl(24.6 95% 53.1%);
+  --orange-600: hsl(20.5 90.2% 48.2%);
+  --orange-700: hsl(17.5 88.3% 40.4%);
+  --orange-800: hsl(15 79.1% 33.7%);
+  --orange-900: hsl(15.3 74.6% 27.8%);
+  --orange-950: hsl(13 81.1% 14.5%);
+
+  /* Amber */
+  --amber-50: hsl(48 100% 96.1%);
+  --amber-100: hsl(48 96.5% 88.8%);
+  --amber-200: hsl(48 96.6% 76.7%);
+  --amber-300: hsl(45.9 96.7% 64.5%);
+  --amber-400: hsl(43.3 96.4% 56.3%);
+  --amber-500: hsl(37.7 92.1% 50.2%);
+  --amber-600: hsl(32.1 94.6% 43.7%);
+  --amber-700: hsl(26 90.5% 37.1%);
+  --amber-800: hsl(22.7 82.5% 31.4%);
+  --amber-900: hsl(21.7 77.8% 26.5%);
+  --amber-950: hsl(20.9 91.7% 14.1%);
+
+  /* Yellow */
+  --yellow-50: hsl(54.5 91.7% 95.3%);
+  --yellow-100: hsl(54.9 96.7% 88%);
+  --yellow-200: hsl(52.8 98.3% 76.9%);
+  --yellow-300: hsl(50.4 97.8% 63.5%);
+  --yellow-400: hsl(47.9 95.8% 53.1%);
+  --yellow-500: hsl(45.4 93.4% 47.5%);
+  --yellow-600: hsl(40.6 96.1% 40.4%);
+  --yellow-700: hsl(35.5 91.7% 32.9%);
+  --yellow-800: hsl(31.8 81% 28.8%);
+  --yellow-900: hsl(28.4 72.5% 25.7%);
+  --yellow-950: hsl(26 83.3% 14.1%);
+
+  /* Lime */
+  --lime-50: hsl(78.3 92% 95.1%);
+  --lime-100: hsl(79.6 89.1% 89.2%);
+  --lime-200: hsl(80.9 88.5% 79.6%);
+  --lime-300: hsl(82 84.5% 67.1%);
+  --lime-400: hsl(82.7 78% 55.5%);
+  --lime-500: hsl(83.7 80.5% 44.3%);
+  --lime-600: hsl(84.8 85.2% 34.5%);
+  --lime-700: hsl(85.9 78.4% 27.3%);
+  --lime-800: hsl(86.3 69% 22.7%);
+  --lime-900: hsl(87.6 61.2% 20.2%);
+  --lime-950: hsl(89.3 80.4% 10%);
+
+  /* Green */
+  --green-50: hsl(138.5 76.5% 96.7%);
+  --green-100: hsl(140.6 84.2% 92.5%);
+  --green-200: hsl(141 78.9% 85.1%);
+  --green-300: hsl(141.7 76.6% 73.1%);
+  --green-400: hsl(141.9 69.2% 58%);
+  --green-500: hsl(142.1 70.6% 45.3%);
+  --green-600: hsl(142.1 76.2% 36.3%);
+  --green-700: hsl(142.4 71.8% 29.2%);
+  --green-800: hsl(142.8 64.2% 24.1%);
+  --green-900: hsl(143.8 61.2% 20.2%);
+  --green-950: hsl(144.9 80.4% 10%);
+
+  /* Emerald */
+  --emerald-50: hsl(151.8 81% 95.9%);
+  --emerald-100: hsl(149.3 80.4% 90%);
+  --emerald-200: hsl(152.4 76% 80.4%);
+  --emerald-300: hsl(156.2 71.6% 66.9%);
+  --emerald-400: hsl(158.1 64.4% 51.6%);
+  --emerald-500: hsl(160.1 84.1% 39.4%);
+  --emerald-600: hsl(161.4 93.5% 30.4%);
+  --emerald-700: hsl(162.9 93.5% 24.3%);
+  --emerald-800: hsl(163.1 88.1% 19.8%);
+  --emerald-900: hsl(164.2 85.7% 16.5%);
+  --emerald-950: hsl(165.7 91.3% 9%);
+
+  /* Teal */
+  --teal-50: hsl(166.2 76.5% 96.7%);
+  --teal-100: hsl(167.2 85.5% 89.2%);
+  --teal-200: hsl(168.4 83.8% 78.2%);
+  --teal-300: hsl(170.6 76.9% 64.3%);
+  --teal-400: hsl(172.5 66% 50.4%);
+  --teal-500: hsl(173.4 80.4% 40%);
+  --teal-600: hsl(174.7 83.9% 31.6%);
+  --teal-700: hsl(175.3 77.4% 26.1%);
+  --teal-800: hsl(176.1 69.4% 21.8%);
+  --teal-900: hsl(175.9 60.8% 19%);
+  --teal-950: hsl(178.6 84.3% 10%);
+
+  /* Cyan */
+  --cyan-50: hsl(183.2 100% 96.3%);
+  --cyan-100: hsl(185.1 95.9% 90.4%);
+  --cyan-200: hsl(186.2 93.5% 81.8%);
+  --cyan-300: hsl(187 92.4% 69%);
+  --cyan-400: hsl(187.9 85.7% 53.3%);
+  --cyan-500: hsl(188.7 94.5% 42.7%);
+  --cyan-600: hsl(191.6 91.4% 36.5%);
+  --cyan-700: hsl(192.9 82.3% 31%);
+  --cyan-800: hsl(194.4 69.6% 27.1%);
+  --cyan-900: hsl(196.4 63.6% 23.7%);
+  --cyan-950: hsl(197 78.9% 14.9%);
+
+  /* Sky */
+  --sky-50: hsl(204 100% 97.1%);
+  --sky-100: hsl(204 93.8% 93.7%);
+  --sky-200: hsl(200.6 94.4% 86.1%);
+  --sky-300: hsl(199.4 95.5% 73.9%);
+  --sky-400: hsl(198.4 93.2% 59.6%);
+  --sky-500: hsl(198.6 88.7% 48.4%);
+  --sky-600: hsl(200.4 98% 39.4%);
+  --sky-700: hsl(201.3 96.3% 32.2%);
+  --sky-800: hsl(201 90% 27.5%);
+  --sky-900: hsl(202 80.3% 23.9%);
+  --sky-950: hsl(204 80.2% 15.9%);
+
+  /* Blue */
+  --blue-50: hsl(213.8 100% 96.9%);
+  --blue-100: hsl(214.3 94.6% 92.7%);
+  --blue-200: hsl(213.3 96.9% 87.3%);
+  --blue-300: hsl(211.7 96.4% 78.4%);
+  --blue-400: hsl(213.1 93.9% 67.8%);
+  --blue-500: hsl(217.2 91.2% 59.8%);
+  --blue-600: hsl(221.2 83.2% 53.3%);
+  --blue-700: hsl(224.3 76.3% 48%);
+  --blue-800: hsl(225.9 70.7% 40.2%);
+  --blue-900: hsl(224.4 64.3% 32.9%);
+  --blue-950: hsl(226.2 57% 21%);
+
+  /* Indigo */
+  --indigo-50: hsl(225.9 100% 96.7%);
+  --indigo-100: hsl(226.5 100% 93.9%);
+  --indigo-200: hsl(228 96.5% 88.8%);
+  --indigo-300: hsl(229.7 93.5% 81.8%);
+  --indigo-400: hsl(234.5 89.5% 73.9%);
+  --indigo-500: hsl(238.7 83.5% 66.7%);
+  --indigo-600: hsl(243.4 75.4% 58.6%);
+  --indigo-700: hsl(244.5 57.9% 50.6%);
+  --indigo-800: hsl(243.7 54.5% 41.4%);
+  --indigo-900: hsl(242.2 47.4% 34.3%);
+  --indigo-950: hsl(243.8 47.1% 20%);
+
+  /* Violet */
+  --violet-50: hsl(250 100% 97.6%);
+  --violet-100: hsl(251.4 91.3% 95.5%);
+  --violet-200: hsl(250.5 95.2% 91.8%);
+  --violet-300: hsl(252.5 94.7% 85.1%);
+  --violet-400: hsl(255.1 91.7% 76.3%);
+  --violet-500: hsl(258.3 89.5% 66.3%);
+  --violet-600: hsl(262.1 83.3% 57.8%);
+  --violet-700: hsl(263.4 70% 50.4%);
+  --violet-800: hsl(263.4 69.3% 42.2%);
+  --violet-900: hsl(263.5 67.4% 34.9%);
+  --violet-950: hsl(261.2 72.6% 22.9%);
+
+  /* Purple */
+  --purple-50: hsl(270 100% 98%);
+  --purple-100: hsl(268.7 100% 95.5%);
+  --purple-200: hsl(268.6 100% 91.8%);
+  --purple-300: hsl(269.2 97.4% 85.1%);
+  --purple-400: hsl(270 95.2% 75.3%);
+  --purple-500: hsl(270.7 91% 65.1%);
+  --purple-600: hsl(271.5 81.3% 55.9%);
+  --purple-700: hsl(272.1 71.7% 47.1%);
+  --purple-800: hsl(272.9 67.2% 39.4%);
+  --purple-900: hsl(273.6 65.6% 32%);
+  --purple-950: hsl(273.5 86.9% 21%);
+
+  /* Fuchsia */
+  --fuchsia-50: hsl(289.1 100% 97.8%);
+  --fuchsia-100: hsl(287 100% 95.5%);
+  --fuchsia-200: hsl(288.3 95.8% 90.6%);
+  --fuchsia-300: hsl(291.1 93.1% 82.9%);
+  --fuchsia-400: hsl(292 91.4% 72.5%);
+  --fuchsia-500: hsl(292.2 84.1% 60.6%);
+  --fuchsia-600: hsl(293.4 69.5% 48.8%);
+  --fuchsia-700: hsl(294.7 72.4% 39.8%);
+  --fuchsia-800: hsl(295.4 70.2% 32.9%);
+  --fuchsia-900: hsl(296.7 63.6% 28%);
+  --fuchsia-950: hsl(296.8 90.2% 16.1%);
+
+  /* Pink */
+  --pink-50: hsl(327.3 73.3% 97.1%);
+  --pink-100: hsl(325.7 77.8% 94.7%);
+  --pink-200: hsl(325.9 84.6% 89.8%);
+  --pink-300: hsl(327.4 87.1% 81.8%);
+  --pink-400: hsl(328.6 85.5% 70.2%);
+  --pink-500: hsl(330.4 81.2% 60.4%);
+  --pink-600: hsl(333.3 71.4% 50.6%);
+  --pink-700: hsl(335.1 77.6% 42%);
+  --pink-800: hsl(335.8 74.4% 35.3%);
+  --pink-900: hsl(335.9 69% 30.4%);
+  --pink-950: hsl(336.2 83.9% 17.1%);
+
+  /* Rose */
+  --rose-50: hsl(355.7 100% 97.3%);
+  --rose-100: hsl(355.6 100% 94.7%);
+  --rose-200: hsl(352.7 96.1% 90%);
+  --rose-300: hsl(352.6 95.7% 81.8%);
+  --rose-400: hsl(351.3 94.5% 71.4%);
+  --rose-500: hsl(349.7 89.2% 60.2%);
+  --rose-600: hsl(346.8 77.2% 49.8%);
+  --rose-700: hsl(345.3 82.7% 40.8%);
+  --rose-800: hsl(343.4 79.7% 34.7%);
+  --rose-900: hsl(341.5 75.5% 30.4%);
+  --rose-950: hsl(343.1 87.7% 15.9%);
+}
+
+
+
+:root {
+  --hardware-pixel: 1px;
+}
+
+@media (min-resolution: 2dppx) {
+  :root {
+    --hardware-pixel: 0.5px;
+  }
+}
+
+@media (min-resolution: 3dppx) {
+  :root {
+    --hardware-pixel: 0.33333px;
+  }
+}
+
+@media (min-resolution: 4dppx) {
+  :root {
+    --hardware-pixel: 0.25px;
+  }
+}
+
+:root {
+  font-size: 12px;
+  --spacing-small: 3px;
+  --spacing-medium: 6px;
+  --spacing-large: 12px;
+  --spacing-x-large: 24px;
+}
+
+select {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+com-native-menu, button, select {
+  user-select: none;
+  white-space: nowrap;
+  padding: var(--spacing-small) var(--spacing-medium);
+  border-radius: 10px;
+  border-width: calc(2 * var(--hardware-pixel));
+  border-style: solid;
+  cursor: pointer;
+  border-color: var(--theme-control-border);
+  background-color: var(--theme-control-bg);
+  color: inherit;
+}
+
+com-native-menu {
+  /* for specificity */
+  /* No padding for this as we have a transparent
+  control below that needs to be clickable
+  even on the padding */
+  padding: 0;
+}
+
+com-native-menu:hover,
+select:hover,
+button:hover {
+  background-color: var(--theme-control-bg-hover);
+}
+
+com-native-menu[disabled], select[disabled], button[disabled] {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:has(> svg) {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-medium);
+}
+
+button:has(> svg) > * {
+  display: flex;
+}
+
+com-native-menu:focus-within,
+button:focus-visible,
+select:focus-visible {
+  background-color: var(--theme-control-bg-hover);
+  outline-style: solid;
+  outline-width: calc(3 * var(--hardware-pixel));
+  outline-color: var(--theme-control-border-focus);
+  z-index: 1;
+}
+
+/* Doesn't look good on Firefox - let's put it on the <p> */
+  [contenteditable].firefox:focus-visible {
+    outline-style: none;
+  }
+
+  p:has([contenteditable].firefox:focus-visible) {
+    outline-style: auto;
+  }
+/* -- */
+
+[tooltip] {
+  position: relative;
+}
+
+[tooltip]:not(:hover)::after {
+  opacity: 0;
+  transition-property: opacity;
+  transition-duration: 0s;
+  transition-delay: 0s;
+}
+
+[tooltip]:hover::after {
+  transition-delay: 500ms;
+}
+
+[tooltip]::after {
+  z-index: 4;
+  left: 50%;
+  bottom: -3px;
+  transform: translateX(-50%) translateY(100%);
+
+  content: attr(tooltip);
+  position: absolute;
+  text-align: center;
+  padding: var(--spacing-small) var(--spacing-medium);
+  min-width: 80px;
+  width: max-content;
+  max-width: 120px;
+  max-height: 120px;
+  overflow: hidden;
+  text-wrap: auto;
+  border-radius: 10px;
+  pointer-events: none;
+
+  opacity: 0.8;
+
+  background-color: light-dark(var(--neutral-950), var(--neutral-50));
+  color: light-dark(var(--neutral-50), var(--neutral-950));
+}
+
+[tooltip].tooltip-prevent-right-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(100%);
+}
+
+[tooltip].tooltip-prevent-bottom-edge::after {
+  transform: translateX(-50%) translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-left-and-bottom-edge::after {
+  right: unset;
+  left: 0%;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-right-and-bottom-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+  #button_dismiss:not(:focus) {
+    border-color: transparent;
+  }
+
+  #button_dismiss {
+    padding: 0;
+    background-color: unset;
+    color: var(--theme-dismiss);
+  }
+
+  #button_dismiss:hover {
+    color: var(--theme-dismiss-hover);
+  }
+
+  
+#button_report_nomedia, #button_report, #button_reporting, #button_reported, #button_help, #button_show_translate {
+    display: none !important;
+}
+
+#box_account_not_linux, #p_leave_review {
+    display: none !important;
+}
+</style>
+  <button id="button_dismiss">
+    <svg width="16" height="16" stroke-width="1.5" viewBox="0 0 24 24"
+      fill="none" stroke="currentColor">
+      <path d="M6.75827 17.2426L12.0009 12M17.2435 6.75736L12.0009 12M12.0009 12L6.75827 6.75736M12.0009 12L17.2435 17.2426" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+    </svg>
+  </button>
+</template>
+
+    <template id="media-downloaded-template">
+  <style>
+
+  :root {
+  --dismiss-button-width: calc(16px + var(--spacing-medium) + 2 * var(--hardware-pixel));
+  --dismiss-button-height: calc(16px + 2 * var(--hardware-pixel));
+  --video-height: 80px;
+}
+
+.roundedbox {
+  border-radius: 10px;
+  border-style: solid;
+  border-width: 1px;
+  background-color: var(--theme-box-bg);
+  border-color: var(--theme-box-border);
+  box-shadow: 0 1px 2px var(--theme-box-shadow);
+}
+.media_filename {
+  display: inline;
+  border-radius: var(--spacing-small);
+  margin-right: var(--dismiss-button-width);
+  min-height: var(--dismiss-button-height);
+  font-size: 1.1rem;
+  line-height: 1.25rem;
+}
+
+.media_hbox {
+  flex-wrap: wrap;
+  gap: var(--spacing-small);
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+.media_vbox {
+  gap: var(--spacing-small);
+  min-height: var(--video-height);
+}
+
+@media(max-width: 400px) {
+  /* The sidebar width is real small.
+     Let's make everything small. */
+  :host {
+    font-size: 0.8rem;
+    --spacing-small: 2px;
+    --spacing-medium: 4px;
+    --spacing-large: 8px;
+    --spacing-x-large: 16px;
+    --video-height: 70px;
+  }
+  .media_filename {
+    word-break: break-all;
+    font-size: 1em;
+  }
+}
+
+#box_combo > button > svg {
+  width: 12px;
+  height: 12px;
+}
+
+#box_combo > * {
+  margin: 0;
+  font-weight: 600;
+  border-radius: 0;
+  border-width: 0;
+  color: var(--theme-colored-fg);
+  border-top-left-radius: 100px;
+  border-bottom-left-radius: 100px;
+}
+
+#box_combo > *:last-child {
+  border-top-right-radius: 100px;
+  border-bottom-right-radius: 100px;
+}
+
+#box_combo > *:last-child:not(:first-child) {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: calc(-2 * var(--hardware-pixel));
+  border-left-width: calc(2 * var(--hardware-pixel));
+}
+  *, *::before, *::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+body {
+  line-height: 1.5;
+  text-size-adjust: none;
+  font-size: 1rem;
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  -webkit-font-smoothing: antialiased;
+  font-family: system-ui, sans-serif;
+}
+
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+
+a {
+  text-decoration-skip-ink: auto;
+  color: currentColor;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+}
+
+box, hbox, vbox, spacer, stack {
+  flex-shrink: 0;
+  display: flex;
+  /*
+    These are necessary really.
+    Otherwise set to min-*: auto, messing up flex logic.
+  */
+  min-height: 0;
+  min-width: 0;
+}
+
+hbox {
+  flex-flow: row;
+  text-overflow: ellipsis;
+}
+
+wrappable-text {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+vbox {
+  flex-flow: column;
+  /* Not sure why I had that at some point… */
+  /* width: 100%; */
+}
+
+stack {
+  position: relative;
+  overflow: hidden;
+}
+
+stack > * {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+[wrap] { flex-wrap: wrap }
+[stretch] { align-self: stretch }
+[hidden="true"] { display: none!important; }
+
+[flex] { display: flex }
+[flex="1"] { flex-grow: 1 }
+[flex="2"] { flex-grow: 2 }
+[flex="3"] { flex-grow: 3 }
+[flex="4"] { flex-grow: 4 }
+[flex="5"] { flex-grow: 5 }
+[flex="6"] { flex-grow: 6 }
+[flex="7"] { flex-grow: 7 }
+[flex="8"] { flex-grow: 8 }
+[flex="9"] { flex-grow: 9 }
+
+/* We don't use the align=… attribute. Browser engines map that into a text-align=center!!! */
+[xalign="start"] { align-items: flex-start }
+[xalign="center"] { align-items: center }
+[xalign="end"] { align-items: flex-end }
+[xalign="baseline"] { align-items: flex-baseline }
+[xalign="stretch"] { align-items: stretch }
+
+[pack="start"] { justify-content: flex-start }
+[pack="center"] { justify-content: center }
+[pack="end"] { justify-content: flex-end }
+
+/* DEBUG */
+
+[debug] hbox,
+[debug] vbox,
+[debug] box,
+[debug] spacer {
+  margin: 8px;
+  padding: 8px;
+  outline: 1px dashed black;
+  position: relative;
+}
+
+/* [debug] hbox { background: green; } */
+/* [debug] vbox { background: blue; } */
+/* [debug] spacer { background: yellow; } */
+/* [debug] box { background: orange; } */
+
+[debug] hbox:before,
+[debug] vbox:before,
+[debug] box:before {
+  position: absolute;
+  font-size: 6px;
+  top: 0; left: 0;
+  display: block;
+  content: attr(id);
+}
+
+/* From https://github.com/shadcn-ui/ui/issues/669 */
+
+/* Palette: https://tailwindcss.com/docs/customizing-colors */
+
+:root {
+  /* Slate */
+  --slate-50: hsl(210 40% 98%);
+  --slate-100: hsl(210 40% 96.1%);
+  --slate-200: hsl(214.3 31.8% 91.4%);
+  --slate-300: hsl(212.7 26.8% 83.9%);
+  --slate-400: hsl(215 20.2% 65.1%);
+  --slate-500: hsl(215.4 16.3% 46.9%);
+  --slate-600: hsl(215.3 19.3% 34.5%);
+  --slate-700: hsl(215.3 25% 26.7%);
+  --slate-800: hsl(217.2 32.6% 17.5%);
+  --slate-900: hsl(222.2 47.4% 11.2%);
+  --slate-950: hsl(228.6 84% 4.9%);
+
+  /* Gray */
+  --gray-50: hsl(210 20% 98%);
+  --gray-100: hsl(220 14.3% 95.9%);
+  --gray-200: hsl(220 13% 91%);
+  --gray-300: hsl(216 12.2% 83.9%);
+  --gray-400: hsl(217.9 10.6% 64.9%);
+  --gray-500: hsl(220 8.9% 46.1%);
+  --gray-600: hsl(215 13.8% 34.1%);
+  --gray-700: hsl(216.9 19.1% 26.7%);
+  --gray-800: hsl(215 27.9% 16.9%);
+  --gray-900: hsl(220.9 39.3% 11%);
+  --gray-950: hsl(224 71.4% 4.1%);
+
+  /* Zinc */
+  --zinc-50: hsl(0 0% 98%);
+  --zinc-100: hsl(240 4.8% 95.9%);
+  --zinc-200: hsl(240 5.9% 90%);
+  --zinc-300: hsl(240 4.9% 83.9%);
+  --zinc-400: hsl(240 5% 64.9%);
+  --zinc-500: hsl(240 3.8% 46.1%);
+  --zinc-600: hsl(240 5.2% 33.9%);
+  --zinc-700: hsl(240 5.3% 26.1%);
+  --zinc-800: hsl(240 3.7% 15.9%);
+  --zinc-900: hsl(240 5.9% 10%);
+  --zinc-950: hsl(240 10% 3.9%);
+
+  /* Neutral */
+  --neutral-50: hsl(0 0% 98%);
+  --neutral-100: hsl(0 0% 96.1%);
+  --neutral-200: hsl(0 0% 89.8%);
+  --neutral-300: hsl(0 0% 83.1%);
+  --neutral-400: hsl(0 0% 63.9%);
+  --neutral-500: hsl(0 0% 45.1%);
+  --neutral-600: hsl(0 0% 32.2%);
+  --neutral-700: hsl(0 0% 25.1%);
+  --neutral-800: hsl(0 0% 14.9%);
+  --neutral-900: hsl(0 0% 9%);
+  --neutral-950: hsl(0 0% 3.9%);
+
+  /* Stone */
+  --stone-50: hsl(60 9.1% 97.8%);
+  --stone-100: hsl(60 4.8% 95.9%);
+  --stone-200: hsl(20 5.9% 90%);
+  --stone-300: hsl(24 5.7% 82.9%);
+  --stone-400: hsl(24 5.4% 63.9%);
+  --stone-500: hsl(25 5.3% 44.7%);
+  --stone-600: hsl(33.3 5.5% 32.4%);
+  --stone-700: hsl(30 6.3% 25.1%);
+  --stone-800: hsl(12 6.5% 15.1%);
+  --stone-900: hsl(24 9.8% 10%);
+  --stone-950: hsl(20 14.3% 4.1%);
+
+  /* Red */
+  --red-50: hsl(0 85.7% 97.3%);
+  --red-100: hsl(0 93.3% 94.1%);
+  --red-200: hsl(0 96.3% 89.4%);
+  --red-300: hsl(0 93.5% 81.8%);
+  --red-400: hsl(0 90.6% 70.8%);
+  --red-500: hsl(0 84.2% 60.2%);
+  --red-600: hsl(0 72.2% 50.6%);
+  --red-700: hsl(0 73.7% 41.8%);
+  --red-800: hsl(0 70% 35.3%);
+  --red-900: hsl(0 62.8% 30.6%);
+  --red-950: hsl(0 74.7% 15.5%);
+
+  /* Orange */
+  --orange-50: hsl(33.3 100% 96.5%);
+  --orange-100: hsl(34.3 100% 91.8%);
+  --orange-200: hsl(32.1 97.7% 83.1%);
+  --orange-300: hsl(30.7 97.2% 72.4%);
+  --orange-400: hsl(27 96% 61%);
+  --orange-500: hsl(24.6 95% 53.1%);
+  --orange-600: hsl(20.5 90.2% 48.2%);
+  --orange-700: hsl(17.5 88.3% 40.4%);
+  --orange-800: hsl(15 79.1% 33.7%);
+  --orange-900: hsl(15.3 74.6% 27.8%);
+  --orange-950: hsl(13 81.1% 14.5%);
+
+  /* Amber */
+  --amber-50: hsl(48 100% 96.1%);
+  --amber-100: hsl(48 96.5% 88.8%);
+  --amber-200: hsl(48 96.6% 76.7%);
+  --amber-300: hsl(45.9 96.7% 64.5%);
+  --amber-400: hsl(43.3 96.4% 56.3%);
+  --amber-500: hsl(37.7 92.1% 50.2%);
+  --amber-600: hsl(32.1 94.6% 43.7%);
+  --amber-700: hsl(26 90.5% 37.1%);
+  --amber-800: hsl(22.7 82.5% 31.4%);
+  --amber-900: hsl(21.7 77.8% 26.5%);
+  --amber-950: hsl(20.9 91.7% 14.1%);
+
+  /* Yellow */
+  --yellow-50: hsl(54.5 91.7% 95.3%);
+  --yellow-100: hsl(54.9 96.7% 88%);
+  --yellow-200: hsl(52.8 98.3% 76.9%);
+  --yellow-300: hsl(50.4 97.8% 63.5%);
+  --yellow-400: hsl(47.9 95.8% 53.1%);
+  --yellow-500: hsl(45.4 93.4% 47.5%);
+  --yellow-600: hsl(40.6 96.1% 40.4%);
+  --yellow-700: hsl(35.5 91.7% 32.9%);
+  --yellow-800: hsl(31.8 81% 28.8%);
+  --yellow-900: hsl(28.4 72.5% 25.7%);
+  --yellow-950: hsl(26 83.3% 14.1%);
+
+  /* Lime */
+  --lime-50: hsl(78.3 92% 95.1%);
+  --lime-100: hsl(79.6 89.1% 89.2%);
+  --lime-200: hsl(80.9 88.5% 79.6%);
+  --lime-300: hsl(82 84.5% 67.1%);
+  --lime-400: hsl(82.7 78% 55.5%);
+  --lime-500: hsl(83.7 80.5% 44.3%);
+  --lime-600: hsl(84.8 85.2% 34.5%);
+  --lime-700: hsl(85.9 78.4% 27.3%);
+  --lime-800: hsl(86.3 69% 22.7%);
+  --lime-900: hsl(87.6 61.2% 20.2%);
+  --lime-950: hsl(89.3 80.4% 10%);
+
+  /* Green */
+  --green-50: hsl(138.5 76.5% 96.7%);
+  --green-100: hsl(140.6 84.2% 92.5%);
+  --green-200: hsl(141 78.9% 85.1%);
+  --green-300: hsl(141.7 76.6% 73.1%);
+  --green-400: hsl(141.9 69.2% 58%);
+  --green-500: hsl(142.1 70.6% 45.3%);
+  --green-600: hsl(142.1 76.2% 36.3%);
+  --green-700: hsl(142.4 71.8% 29.2%);
+  --green-800: hsl(142.8 64.2% 24.1%);
+  --green-900: hsl(143.8 61.2% 20.2%);
+  --green-950: hsl(144.9 80.4% 10%);
+
+  /* Emerald */
+  --emerald-50: hsl(151.8 81% 95.9%);
+  --emerald-100: hsl(149.3 80.4% 90%);
+  --emerald-200: hsl(152.4 76% 80.4%);
+  --emerald-300: hsl(156.2 71.6% 66.9%);
+  --emerald-400: hsl(158.1 64.4% 51.6%);
+  --emerald-500: hsl(160.1 84.1% 39.4%);
+  --emerald-600: hsl(161.4 93.5% 30.4%);
+  --emerald-700: hsl(162.9 93.5% 24.3%);
+  --emerald-800: hsl(163.1 88.1% 19.8%);
+  --emerald-900: hsl(164.2 85.7% 16.5%);
+  --emerald-950: hsl(165.7 91.3% 9%);
+
+  /* Teal */
+  --teal-50: hsl(166.2 76.5% 96.7%);
+  --teal-100: hsl(167.2 85.5% 89.2%);
+  --teal-200: hsl(168.4 83.8% 78.2%);
+  --teal-300: hsl(170.6 76.9% 64.3%);
+  --teal-400: hsl(172.5 66% 50.4%);
+  --teal-500: hsl(173.4 80.4% 40%);
+  --teal-600: hsl(174.7 83.9% 31.6%);
+  --teal-700: hsl(175.3 77.4% 26.1%);
+  --teal-800: hsl(176.1 69.4% 21.8%);
+  --teal-900: hsl(175.9 60.8% 19%);
+  --teal-950: hsl(178.6 84.3% 10%);
+
+  /* Cyan */
+  --cyan-50: hsl(183.2 100% 96.3%);
+  --cyan-100: hsl(185.1 95.9% 90.4%);
+  --cyan-200: hsl(186.2 93.5% 81.8%);
+  --cyan-300: hsl(187 92.4% 69%);
+  --cyan-400: hsl(187.9 85.7% 53.3%);
+  --cyan-500: hsl(188.7 94.5% 42.7%);
+  --cyan-600: hsl(191.6 91.4% 36.5%);
+  --cyan-700: hsl(192.9 82.3% 31%);
+  --cyan-800: hsl(194.4 69.6% 27.1%);
+  --cyan-900: hsl(196.4 63.6% 23.7%);
+  --cyan-950: hsl(197 78.9% 14.9%);
+
+  /* Sky */
+  --sky-50: hsl(204 100% 97.1%);
+  --sky-100: hsl(204 93.8% 93.7%);
+  --sky-200: hsl(200.6 94.4% 86.1%);
+  --sky-300: hsl(199.4 95.5% 73.9%);
+  --sky-400: hsl(198.4 93.2% 59.6%);
+  --sky-500: hsl(198.6 88.7% 48.4%);
+  --sky-600: hsl(200.4 98% 39.4%);
+  --sky-700: hsl(201.3 96.3% 32.2%);
+  --sky-800: hsl(201 90% 27.5%);
+  --sky-900: hsl(202 80.3% 23.9%);
+  --sky-950: hsl(204 80.2% 15.9%);
+
+  /* Blue */
+  --blue-50: hsl(213.8 100% 96.9%);
+  --blue-100: hsl(214.3 94.6% 92.7%);
+  --blue-200: hsl(213.3 96.9% 87.3%);
+  --blue-300: hsl(211.7 96.4% 78.4%);
+  --blue-400: hsl(213.1 93.9% 67.8%);
+  --blue-500: hsl(217.2 91.2% 59.8%);
+  --blue-600: hsl(221.2 83.2% 53.3%);
+  --blue-700: hsl(224.3 76.3% 48%);
+  --blue-800: hsl(225.9 70.7% 40.2%);
+  --blue-900: hsl(224.4 64.3% 32.9%);
+  --blue-950: hsl(226.2 57% 21%);
+
+  /* Indigo */
+  --indigo-50: hsl(225.9 100% 96.7%);
+  --indigo-100: hsl(226.5 100% 93.9%);
+  --indigo-200: hsl(228 96.5% 88.8%);
+  --indigo-300: hsl(229.7 93.5% 81.8%);
+  --indigo-400: hsl(234.5 89.5% 73.9%);
+  --indigo-500: hsl(238.7 83.5% 66.7%);
+  --indigo-600: hsl(243.4 75.4% 58.6%);
+  --indigo-700: hsl(244.5 57.9% 50.6%);
+  --indigo-800: hsl(243.7 54.5% 41.4%);
+  --indigo-900: hsl(242.2 47.4% 34.3%);
+  --indigo-950: hsl(243.8 47.1% 20%);
+
+  /* Violet */
+  --violet-50: hsl(250 100% 97.6%);
+  --violet-100: hsl(251.4 91.3% 95.5%);
+  --violet-200: hsl(250.5 95.2% 91.8%);
+  --violet-300: hsl(252.5 94.7% 85.1%);
+  --violet-400: hsl(255.1 91.7% 76.3%);
+  --violet-500: hsl(258.3 89.5% 66.3%);
+  --violet-600: hsl(262.1 83.3% 57.8%);
+  --violet-700: hsl(263.4 70% 50.4%);
+  --violet-800: hsl(263.4 69.3% 42.2%);
+  --violet-900: hsl(263.5 67.4% 34.9%);
+  --violet-950: hsl(261.2 72.6% 22.9%);
+
+  /* Purple */
+  --purple-50: hsl(270 100% 98%);
+  --purple-100: hsl(268.7 100% 95.5%);
+  --purple-200: hsl(268.6 100% 91.8%);
+  --purple-300: hsl(269.2 97.4% 85.1%);
+  --purple-400: hsl(270 95.2% 75.3%);
+  --purple-500: hsl(270.7 91% 65.1%);
+  --purple-600: hsl(271.5 81.3% 55.9%);
+  --purple-700: hsl(272.1 71.7% 47.1%);
+  --purple-800: hsl(272.9 67.2% 39.4%);
+  --purple-900: hsl(273.6 65.6% 32%);
+  --purple-950: hsl(273.5 86.9% 21%);
+
+  /* Fuchsia */
+  --fuchsia-50: hsl(289.1 100% 97.8%);
+  --fuchsia-100: hsl(287 100% 95.5%);
+  --fuchsia-200: hsl(288.3 95.8% 90.6%);
+  --fuchsia-300: hsl(291.1 93.1% 82.9%);
+  --fuchsia-400: hsl(292 91.4% 72.5%);
+  --fuchsia-500: hsl(292.2 84.1% 60.6%);
+  --fuchsia-600: hsl(293.4 69.5% 48.8%);
+  --fuchsia-700: hsl(294.7 72.4% 39.8%);
+  --fuchsia-800: hsl(295.4 70.2% 32.9%);
+  --fuchsia-900: hsl(296.7 63.6% 28%);
+  --fuchsia-950: hsl(296.8 90.2% 16.1%);
+
+  /* Pink */
+  --pink-50: hsl(327.3 73.3% 97.1%);
+  --pink-100: hsl(325.7 77.8% 94.7%);
+  --pink-200: hsl(325.9 84.6% 89.8%);
+  --pink-300: hsl(327.4 87.1% 81.8%);
+  --pink-400: hsl(328.6 85.5% 70.2%);
+  --pink-500: hsl(330.4 81.2% 60.4%);
+  --pink-600: hsl(333.3 71.4% 50.6%);
+  --pink-700: hsl(335.1 77.6% 42%);
+  --pink-800: hsl(335.8 74.4% 35.3%);
+  --pink-900: hsl(335.9 69% 30.4%);
+  --pink-950: hsl(336.2 83.9% 17.1%);
+
+  /* Rose */
+  --rose-50: hsl(355.7 100% 97.3%);
+  --rose-100: hsl(355.6 100% 94.7%);
+  --rose-200: hsl(352.7 96.1% 90%);
+  --rose-300: hsl(352.6 95.7% 81.8%);
+  --rose-400: hsl(351.3 94.5% 71.4%);
+  --rose-500: hsl(349.7 89.2% 60.2%);
+  --rose-600: hsl(346.8 77.2% 49.8%);
+  --rose-700: hsl(345.3 82.7% 40.8%);
+  --rose-800: hsl(343.4 79.7% 34.7%);
+  --rose-900: hsl(341.5 75.5% 30.4%);
+  --rose-950: hsl(343.1 87.7% 15.9%);
+}
+
+
+
+:root {
+  --hardware-pixel: 1px;
+}
+
+@media (min-resolution: 2dppx) {
+  :root {
+    --hardware-pixel: 0.5px;
+  }
+}
+
+@media (min-resolution: 3dppx) {
+  :root {
+    --hardware-pixel: 0.33333px;
+  }
+}
+
+@media (min-resolution: 4dppx) {
+  :root {
+    --hardware-pixel: 0.25px;
+  }
+}
+
+:root {
+  font-size: 12px;
+  --spacing-small: 3px;
+  --spacing-medium: 6px;
+  --spacing-large: 12px;
+  --spacing-x-large: 24px;
+}
+
+select {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+com-native-menu, button, select {
+  user-select: none;
+  white-space: nowrap;
+  padding: var(--spacing-small) var(--spacing-medium);
+  border-radius: 10px;
+  border-width: calc(2 * var(--hardware-pixel));
+  border-style: solid;
+  cursor: pointer;
+  border-color: var(--theme-control-border);
+  background-color: var(--theme-control-bg);
+  color: inherit;
+}
+
+com-native-menu {
+  /* for specificity */
+  /* No padding for this as we have a transparent
+  control below that needs to be clickable
+  even on the padding */
+  padding: 0;
+}
+
+com-native-menu:hover,
+select:hover,
+button:hover {
+  background-color: var(--theme-control-bg-hover);
+}
+
+com-native-menu[disabled], select[disabled], button[disabled] {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:has(> svg) {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-medium);
+}
+
+button:has(> svg) > * {
+  display: flex;
+}
+
+com-native-menu:focus-within,
+button:focus-visible,
+select:focus-visible {
+  background-color: var(--theme-control-bg-hover);
+  outline-style: solid;
+  outline-width: calc(3 * var(--hardware-pixel));
+  outline-color: var(--theme-control-border-focus);
+  z-index: 1;
+}
+
+/* Doesn't look good on Firefox - let's put it on the <p> */
+  [contenteditable].firefox:focus-visible {
+    outline-style: none;
+  }
+
+  p:has([contenteditable].firefox:focus-visible) {
+    outline-style: auto;
+  }
+/* -- */
+
+[tooltip] {
+  position: relative;
+}
+
+[tooltip]:not(:hover)::after {
+  opacity: 0;
+  transition-property: opacity;
+  transition-duration: 0s;
+  transition-delay: 0s;
+}
+
+[tooltip]:hover::after {
+  transition-delay: 500ms;
+}
+
+[tooltip]::after {
+  z-index: 4;
+  left: 50%;
+  bottom: -3px;
+  transform: translateX(-50%) translateY(100%);
+
+  content: attr(tooltip);
+  position: absolute;
+  text-align: center;
+  padding: var(--spacing-small) var(--spacing-medium);
+  min-width: 80px;
+  width: max-content;
+  max-width: 120px;
+  max-height: 120px;
+  overflow: hidden;
+  text-wrap: auto;
+  border-radius: 10px;
+  pointer-events: none;
+
+  opacity: 0.8;
+
+  background-color: light-dark(var(--neutral-950), var(--neutral-50));
+  color: light-dark(var(--neutral-50), var(--neutral-950));
+}
+
+[tooltip].tooltip-prevent-right-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(100%);
+}
+
+[tooltip].tooltip-prevent-bottom-edge::after {
+  transform: translateX(-50%) translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-left-and-bottom-edge::after {
+  right: unset;
+  left: 0%;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-right-and-bottom-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+  #box_combo > * {
+    --theme-control-bg-hover: light-dark(var(--green-500), var(--green-600));
+    --theme-control-bg: light-dark(var(--green-600), var(--green-500));
+    --theme-control-border: var(--green-800);
+  }
+
+  :host {
+    transition: opacity 400ms ease;
+  }
+
+  :host(.disappearing) {
+    pointer-events: none;
+    opacity: 0.5;
+  }
+
+  :host(.collapsed) {
+    font-size: 0.8rem;
+  }
+
+  :host(.collapsed) .media_filename {
+    font-style: normal;
+  }
+
+  :host(.collapsed) #button_retry {
+    display: none;
+  }
+
+  :host(.collapsed) .media_vbox {
+    min-height: unset;
+  }
+
+  :host(:not(.collapsed)) #button_origin {
+    display: none;
+  }
+
+  /* Collapse buttons in pill shape */
+
+  :host(.collapsed) .media_hbox > button:nth-of-type(2),
+  :host(:not(.collapsed)) .media_hbox > button:nth-of-type(1) {
+    border-radius: 100px 0 0 100px;
+  }
+
+  .media_hbox > button {
+    border-right-width: 0;
+    border-radius: 0;
+  }
+
+  .media_hbox > button:last-of-type {
+    border-radius: 0 100px 100px 0;
+    margin-right: var(--spacing-small);
+    border-width: 1px;
+  }
+
+  .media_hbox {
+    gap: 0;
+  }
+
+  
+#button_report_nomedia, #button_report, #button_reporting, #button_reported, #button_help, #button_show_translate {
+    display: none !important;
+}
+
+#box_account_not_linux, #p_leave_review {
+    display: none !important;
+}
+
+
+/* ═══ HITIF PREMIUM — media-downloaded-template ═══ */
+:host { font-family: 'Outfit', system-ui, sans-serif; }
+.media_filename { font-family: 'DM Mono', monospace !important; font-size: 0.8rem !important; color: hsl(220 20% 70%) !important; }
+#box_combo { gap: 1px !important; border-radius: 10px !important; overflow: hidden !important; box-shadow: 0 2px 8px hsl(0 0% 0% / 0.3) !important; }
+#box_combo > * {
+  background: linear-gradient(135deg, hsl(145 60% 22%), hsl(145 60% 16%)) !important;
+  border: none !important; color: hsl(145 90% 85%) !important; font-weight: 600 !important; border-radius: 0 !important; box-shadow: none !important;
+}
+#box_combo > *:first-child { border-top-left-radius: 10px !important; border-bottom-left-radius: 10px !important; }
+#box_combo > *:last-child  { border-top-right-radius: 10px !important; border-bottom-right-radius: 10px !important; }
+#box_combo > *:hover { filter: brightness(1.1) !important; transform: none !important; }
+
+</style>
+
+  <vbox class="media_vbox">
+    <p class="media_filename" id="p_filename"></p>
+    <spacer flex="1"></spacer>
+    <hbox class="media_hbox">
+      <hbox flex="1">
+        <com-media-button-origin id="button_origin"></com-media-button-origin>
+      </hbox>
+      <button id="button_retry" data-i18n-tooltip="retry_download_button_tooltip">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2v1z"></path>
+          <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466z"></path>
+        </svg>
+      </button>
+      <button id="button_rm" data-i18n-tooltip="delete_file_button_tooltip">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5Zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6Z"></path>
+          <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1ZM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118ZM2.5 3h11V2h-11v1Z"></path>
+        </svg>
+      </button>
+      <button id="button_not_playing" data-i18n-tooltip="video_not_playing_button_tooltip" class="tooltip-prevent-right-edge">
+        <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+          <path d="M4.355.522a.5.5 0 0 1 .623.333l.291.956A5 5 0 0 1 8 1c1.007 0 1.946.298 2.731.811l.29-.956a.5.5 0 1 1 .957.29l-.41 1.352A5 5 0 0 1 13 6h.5a.5.5 0 0 0 .5-.5V5a.5.5 0 0 1 1 0v.5A1.5 1.5 0 0 1 13.5 7H13v1h1.5a.5.5 0 0 1 0 1H13v1h.5a1.5 1.5 0 0 1 1.5 1.5v.5a.5.5 0 1 1-1 0v-.5a.5.5 0 0 0-.5-.5H13a5 5 0 0 1-10 0h-.5a.5.5 0 0 0-.5.5v.5a.5.5 0 1 1-1 0v-.5A1.5 1.5 0 0 1 2.5 10H3V9H1.5a.5.5 0 0 1 0-1H3V7h-.5A1.5 1.5 0 0 1 1 5.5V5a.5.5 0 0 1 1 0v.5a.5.5 0 0 0 .5.5H3c0-1.364.547-2.601 1.432-3.503l-.41-1.352a.5.5 0 0 1 .333-.623M4 7v4a4 4 0 0 0 3.5 3.97V7zm4.5 0v7.97A4 4 0 0 0 12 11V7zM12 6a4 4 0 0 0-1.334-2.982A3.98 3.98 0 0 0 8 2a3.98 3.98 0 0 0-2.667 1.018A4 4 0 0 0 4 6z"/>
+        </svg>
+      </button>
+      <hbox id="box_combo">
+        <button id="button_play">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0zM6.79 5.093A.5.5 0 0 0 6 5.5v5a.5.5 0 0 0 .79.407l3.5-2.5a.5.5 0 0 0 0-.814l-3.5-2.5z"></path>
+          </svg>
+          <span data-i18n="play"></span>
+        </button>
+        <button id="button_dir" i18n-tooltip="download_directory_button_tooltip" class="tooltip-prevent-right-edge">
+          <svg width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+            <path d="M9.828 3h3.982a2 2 0 0 1 1.992 2.181l-.637 7A2 2 0 0 1 13.174 14H2.825a2 2 0 0 1-1.991-1.819l-.637-7a1.99 1.99 0 0 1 .342-1.31L.5 3a2 2 0 0 1 2-2h3.672a2 2 0 0 1 1.414.586l.828.828A2 2 0 0 0 9.828 3zm-8.322.12C1.72 3.042 1.95 3 2.19 3h5.396l-.707-.707A1 1 0 0 0 6.172 2H2.5a1 1 0 0 0-1 .981l.006.139z"></path>
+          </svg>
+        </button>
+      </hbox>
+    </hbox>
+  </vbox>
+</template>
+
+    <template id="media-selector-template">
+  <style>
+
+  *, *::before, *::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+body {
+  line-height: 1.5;
+  text-size-adjust: none;
+  font-size: 1rem;
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  -webkit-font-smoothing: antialiased;
+  font-family: system-ui, sans-serif;
+}
+
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+
+a {
+  text-decoration-skip-ink: auto;
+  color: currentColor;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+}
+
+box, hbox, vbox, spacer, stack {
+  flex-shrink: 0;
+  display: flex;
+  /*
+    These are necessary really.
+    Otherwise set to min-*: auto, messing up flex logic.
+  */
+  min-height: 0;
+  min-width: 0;
+}
+
+hbox {
+  flex-flow: row;
+  text-overflow: ellipsis;
+}
+
+wrappable-text {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+vbox {
+  flex-flow: column;
+  /* Not sure why I had that at some point… */
+  /* width: 100%; */
+}
+
+stack {
+  position: relative;
+  overflow: hidden;
+}
+
+stack > * {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+[wrap] { flex-wrap: wrap }
+[stretch] { align-self: stretch }
+[hidden="true"] { display: none!important; }
+
+[flex] { display: flex }
+[flex="1"] { flex-grow: 1 }
+[flex="2"] { flex-grow: 2 }
+[flex="3"] { flex-grow: 3 }
+[flex="4"] { flex-grow: 4 }
+[flex="5"] { flex-grow: 5 }
+[flex="6"] { flex-grow: 6 }
+[flex="7"] { flex-grow: 7 }
+[flex="8"] { flex-grow: 8 }
+[flex="9"] { flex-grow: 9 }
+
+/* We don't use the align=… attribute. Browser engines map that into a text-align=center!!! */
+[xalign="start"] { align-items: flex-start }
+[xalign="center"] { align-items: center }
+[xalign="end"] { align-items: flex-end }
+[xalign="baseline"] { align-items: flex-baseline }
+[xalign="stretch"] { align-items: stretch }
+
+[pack="start"] { justify-content: flex-start }
+[pack="center"] { justify-content: center }
+[pack="end"] { justify-content: flex-end }
+
+/* DEBUG */
+
+[debug] hbox,
+[debug] vbox,
+[debug] box,
+[debug] spacer {
+  margin: 8px;
+  padding: 8px;
+  outline: 1px dashed black;
+  position: relative;
+}
+
+/* [debug] hbox { background: green; } */
+/* [debug] vbox { background: blue; } */
+/* [debug] spacer { background: yellow; } */
+/* [debug] box { background: orange; } */
+
+[debug] hbox:before,
+[debug] vbox:before,
+[debug] box:before {
+  position: absolute;
+  font-size: 6px;
+  top: 0; left: 0;
+  display: block;
+  content: attr(id);
+}
+
+/* From https://github.com/shadcn-ui/ui/issues/669 */
+
+/* Palette: https://tailwindcss.com/docs/customizing-colors */
+
+:root {
+  /* Slate */
+  --slate-50: hsl(210 40% 98%);
+  --slate-100: hsl(210 40% 96.1%);
+  --slate-200: hsl(214.3 31.8% 91.4%);
+  --slate-300: hsl(212.7 26.8% 83.9%);
+  --slate-400: hsl(215 20.2% 65.1%);
+  --slate-500: hsl(215.4 16.3% 46.9%);
+  --slate-600: hsl(215.3 19.3% 34.5%);
+  --slate-700: hsl(215.3 25% 26.7%);
+  --slate-800: hsl(217.2 32.6% 17.5%);
+  --slate-900: hsl(222.2 47.4% 11.2%);
+  --slate-950: hsl(228.6 84% 4.9%);
+
+  /* Gray */
+  --gray-50: hsl(210 20% 98%);
+  --gray-100: hsl(220 14.3% 95.9%);
+  --gray-200: hsl(220 13% 91%);
+  --gray-300: hsl(216 12.2% 83.9%);
+  --gray-400: hsl(217.9 10.6% 64.9%);
+  --gray-500: hsl(220 8.9% 46.1%);
+  --gray-600: hsl(215 13.8% 34.1%);
+  --gray-700: hsl(216.9 19.1% 26.7%);
+  --gray-800: hsl(215 27.9% 16.9%);
+  --gray-900: hsl(220.9 39.3% 11%);
+  --gray-950: hsl(224 71.4% 4.1%);
+
+  /* Zinc */
+  --zinc-50: hsl(0 0% 98%);
+  --zinc-100: hsl(240 4.8% 95.9%);
+  --zinc-200: hsl(240 5.9% 90%);
+  --zinc-300: hsl(240 4.9% 83.9%);
+  --zinc-400: hsl(240 5% 64.9%);
+  --zinc-500: hsl(240 3.8% 46.1%);
+  --zinc-600: hsl(240 5.2% 33.9%);
+  --zinc-700: hsl(240 5.3% 26.1%);
+  --zinc-800: hsl(240 3.7% 15.9%);
+  --zinc-900: hsl(240 5.9% 10%);
+  --zinc-950: hsl(240 10% 3.9%);
+
+  /* Neutral */
+  --neutral-50: hsl(0 0% 98%);
+  --neutral-100: hsl(0 0% 96.1%);
+  --neutral-200: hsl(0 0% 89.8%);
+  --neutral-300: hsl(0 0% 83.1%);
+  --neutral-400: hsl(0 0% 63.9%);
+  --neutral-500: hsl(0 0% 45.1%);
+  --neutral-600: hsl(0 0% 32.2%);
+  --neutral-700: hsl(0 0% 25.1%);
+  --neutral-800: hsl(0 0% 14.9%);
+  --neutral-900: hsl(0 0% 9%);
+  --neutral-950: hsl(0 0% 3.9%);
+
+  /* Stone */
+  --stone-50: hsl(60 9.1% 97.8%);
+  --stone-100: hsl(60 4.8% 95.9%);
+  --stone-200: hsl(20 5.9% 90%);
+  --stone-300: hsl(24 5.7% 82.9%);
+  --stone-400: hsl(24 5.4% 63.9%);
+  --stone-500: hsl(25 5.3% 44.7%);
+  --stone-600: hsl(33.3 5.5% 32.4%);
+  --stone-700: hsl(30 6.3% 25.1%);
+  --stone-800: hsl(12 6.5% 15.1%);
+  --stone-900: hsl(24 9.8% 10%);
+  --stone-950: hsl(20 14.3% 4.1%);
+
+  /* Red */
+  --red-50: hsl(0 85.7% 97.3%);
+  --red-100: hsl(0 93.3% 94.1%);
+  --red-200: hsl(0 96.3% 89.4%);
+  --red-300: hsl(0 93.5% 81.8%);
+  --red-400: hsl(0 90.6% 70.8%);
+  --red-500: hsl(0 84.2% 60.2%);
+  --red-600: hsl(0 72.2% 50.6%);
+  --red-700: hsl(0 73.7% 41.8%);
+  --red-800: hsl(0 70% 35.3%);
+  --red-900: hsl(0 62.8% 30.6%);
+  --red-950: hsl(0 74.7% 15.5%);
+
+  /* Orange */
+  --orange-50: hsl(33.3 100% 96.5%);
+  --orange-100: hsl(34.3 100% 91.8%);
+  --orange-200: hsl(32.1 97.7% 83.1%);
+  --orange-300: hsl(30.7 97.2% 72.4%);
+  --orange-400: hsl(27 96% 61%);
+  --orange-500: hsl(24.6 95% 53.1%);
+  --orange-600: hsl(20.5 90.2% 48.2%);
+  --orange-700: hsl(17.5 88.3% 40.4%);
+  --orange-800: hsl(15 79.1% 33.7%);
+  --orange-900: hsl(15.3 74.6% 27.8%);
+  --orange-950: hsl(13 81.1% 14.5%);
+
+  /* Amber */
+  --amber-50: hsl(48 100% 96.1%);
+  --amber-100: hsl(48 96.5% 88.8%);
+  --amber-200: hsl(48 96.6% 76.7%);
+  --amber-300: hsl(45.9 96.7% 64.5%);
+  --amber-400: hsl(43.3 96.4% 56.3%);
+  --amber-500: hsl(37.7 92.1% 50.2%);
+  --amber-600: hsl(32.1 94.6% 43.7%);
+  --amber-700: hsl(26 90.5% 37.1%);
+  --amber-800: hsl(22.7 82.5% 31.4%);
+  --amber-900: hsl(21.7 77.8% 26.5%);
+  --amber-950: hsl(20.9 91.7% 14.1%);
+
+  /* Yellow */
+  --yellow-50: hsl(54.5 91.7% 95.3%);
+  --yellow-100: hsl(54.9 96.7% 88%);
+  --yellow-200: hsl(52.8 98.3% 76.9%);
+  --yellow-300: hsl(50.4 97.8% 63.5%);
+  --yellow-400: hsl(47.9 95.8% 53.1%);
+  --yellow-500: hsl(45.4 93.4% 47.5%);
+  --yellow-600: hsl(40.6 96.1% 40.4%);
+  --yellow-700: hsl(35.5 91.7% 32.9%);
+  --yellow-800: hsl(31.8 81% 28.8%);
+  --yellow-900: hsl(28.4 72.5% 25.7%);
+  --yellow-950: hsl(26 83.3% 14.1%);
+
+  /* Lime */
+  --lime-50: hsl(78.3 92% 95.1%);
+  --lime-100: hsl(79.6 89.1% 89.2%);
+  --lime-200: hsl(80.9 88.5% 79.6%);
+  --lime-300: hsl(82 84.5% 67.1%);
+  --lime-400: hsl(82.7 78% 55.5%);
+  --lime-500: hsl(83.7 80.5% 44.3%);
+  --lime-600: hsl(84.8 85.2% 34.5%);
+  --lime-700: hsl(85.9 78.4% 27.3%);
+  --lime-800: hsl(86.3 69% 22.7%);
+  --lime-900: hsl(87.6 61.2% 20.2%);
+  --lime-950: hsl(89.3 80.4% 10%);
+
+  /* Green */
+  --green-50: hsl(138.5 76.5% 96.7%);
+  --green-100: hsl(140.6 84.2% 92.5%);
+  --green-200: hsl(141 78.9% 85.1%);
+  --green-300: hsl(141.7 76.6% 73.1%);
+  --green-400: hsl(141.9 69.2% 58%);
+  --green-500: hsl(142.1 70.6% 45.3%);
+  --green-600: hsl(142.1 76.2% 36.3%);
+  --green-700: hsl(142.4 71.8% 29.2%);
+  --green-800: hsl(142.8 64.2% 24.1%);
+  --green-900: hsl(143.8 61.2% 20.2%);
+  --green-950: hsl(144.9 80.4% 10%);
+
+  /* Emerald */
+  --emerald-50: hsl(151.8 81% 95.9%);
+  --emerald-100: hsl(149.3 80.4% 90%);
+  --emerald-200: hsl(152.4 76% 80.4%);
+  --emerald-300: hsl(156.2 71.6% 66.9%);
+  --emerald-400: hsl(158.1 64.4% 51.6%);
+  --emerald-500: hsl(160.1 84.1% 39.4%);
+  --emerald-600: hsl(161.4 93.5% 30.4%);
+  --emerald-700: hsl(162.9 93.5% 24.3%);
+  --emerald-800: hsl(163.1 88.1% 19.8%);
+  --emerald-900: hsl(164.2 85.7% 16.5%);
+  --emerald-950: hsl(165.7 91.3% 9%);
+
+  /* Teal */
+  --teal-50: hsl(166.2 76.5% 96.7%);
+  --teal-100: hsl(167.2 85.5% 89.2%);
+  --teal-200: hsl(168.4 83.8% 78.2%);
+  --teal-300: hsl(170.6 76.9% 64.3%);
+  --teal-400: hsl(172.5 66% 50.4%);
+  --teal-500: hsl(173.4 80.4% 40%);
+  --teal-600: hsl(174.7 83.9% 31.6%);
+  --teal-700: hsl(175.3 77.4% 26.1%);
+  --teal-800: hsl(176.1 69.4% 21.8%);
+  --teal-900: hsl(175.9 60.8% 19%);
+  --teal-950: hsl(178.6 84.3% 10%);
+
+  /* Cyan */
+  --cyan-50: hsl(183.2 100% 96.3%);
+  --cyan-100: hsl(185.1 95.9% 90.4%);
+  --cyan-200: hsl(186.2 93.5% 81.8%);
+  --cyan-300: hsl(187 92.4% 69%);
+  --cyan-400: hsl(187.9 85.7% 53.3%);
+  --cyan-500: hsl(188.7 94.5% 42.7%);
+  --cyan-600: hsl(191.6 91.4% 36.5%);
+  --cyan-700: hsl(192.9 82.3% 31%);
+  --cyan-800: hsl(194.4 69.6% 27.1%);
+  --cyan-900: hsl(196.4 63.6% 23.7%);
+  --cyan-950: hsl(197 78.9% 14.9%);
+
+  /* Sky */
+  --sky-50: hsl(204 100% 97.1%);
+  --sky-100: hsl(204 93.8% 93.7%);
+  --sky-200: hsl(200.6 94.4% 86.1%);
+  --sky-300: hsl(199.4 95.5% 73.9%);
+  --sky-400: hsl(198.4 93.2% 59.6%);
+  --sky-500: hsl(198.6 88.7% 48.4%);
+  --sky-600: hsl(200.4 98% 39.4%);
+  --sky-700: hsl(201.3 96.3% 32.2%);
+  --sky-800: hsl(201 90% 27.5%);
+  --sky-900: hsl(202 80.3% 23.9%);
+  --sky-950: hsl(204 80.2% 15.9%);
+
+  /* Blue */
+  --blue-50: hsl(213.8 100% 96.9%);
+  --blue-100: hsl(214.3 94.6% 92.7%);
+  --blue-200: hsl(213.3 96.9% 87.3%);
+  --blue-300: hsl(211.7 96.4% 78.4%);
+  --blue-400: hsl(213.1 93.9% 67.8%);
+  --blue-500: hsl(217.2 91.2% 59.8%);
+  --blue-600: hsl(221.2 83.2% 53.3%);
+  --blue-700: hsl(224.3 76.3% 48%);
+  --blue-800: hsl(225.9 70.7% 40.2%);
+  --blue-900: hsl(224.4 64.3% 32.9%);
+  --blue-950: hsl(226.2 57% 21%);
+
+  /* Indigo */
+  --indigo-50: hsl(225.9 100% 96.7%);
+  --indigo-100: hsl(226.5 100% 93.9%);
+  --indigo-200: hsl(228 96.5% 88.8%);
+  --indigo-300: hsl(229.7 93.5% 81.8%);
+  --indigo-400: hsl(234.5 89.5% 73.9%);
+  --indigo-500: hsl(238.7 83.5% 66.7%);
+  --indigo-600: hsl(243.4 75.4% 58.6%);
+  --indigo-700: hsl(244.5 57.9% 50.6%);
+  --indigo-800: hsl(243.7 54.5% 41.4%);
+  --indigo-900: hsl(242.2 47.4% 34.3%);
+  --indigo-950: hsl(243.8 47.1% 20%);
+
+  /* Violet */
+  --violet-50: hsl(250 100% 97.6%);
+  --violet-100: hsl(251.4 91.3% 95.5%);
+  --violet-200: hsl(250.5 95.2% 91.8%);
+  --violet-300: hsl(252.5 94.7% 85.1%);
+  --violet-400: hsl(255.1 91.7% 76.3%);
+  --violet-500: hsl(258.3 89.5% 66.3%);
+  --violet-600: hsl(262.1 83.3% 57.8%);
+  --violet-700: hsl(263.4 70% 50.4%);
+  --violet-800: hsl(263.4 69.3% 42.2%);
+  --violet-900: hsl(263.5 67.4% 34.9%);
+  --violet-950: hsl(261.2 72.6% 22.9%);
+
+  /* Purple */
+  --purple-50: hsl(270 100% 98%);
+  --purple-100: hsl(268.7 100% 95.5%);
+  --purple-200: hsl(268.6 100% 91.8%);
+  --purple-300: hsl(269.2 97.4% 85.1%);
+  --purple-400: hsl(270 95.2% 75.3%);
+  --purple-500: hsl(270.7 91% 65.1%);
+  --purple-600: hsl(271.5 81.3% 55.9%);
+  --purple-700: hsl(272.1 71.7% 47.1%);
+  --purple-800: hsl(272.9 67.2% 39.4%);
+  --purple-900: hsl(273.6 65.6% 32%);
+  --purple-950: hsl(273.5 86.9% 21%);
+
+  /* Fuchsia */
+  --fuchsia-50: hsl(289.1 100% 97.8%);
+  --fuchsia-100: hsl(287 100% 95.5%);
+  --fuchsia-200: hsl(288.3 95.8% 90.6%);
+  --fuchsia-300: hsl(291.1 93.1% 82.9%);
+  --fuchsia-400: hsl(292 91.4% 72.5%);
+  --fuchsia-500: hsl(292.2 84.1% 60.6%);
+  --fuchsia-600: hsl(293.4 69.5% 48.8%);
+  --fuchsia-700: hsl(294.7 72.4% 39.8%);
+  --fuchsia-800: hsl(295.4 70.2% 32.9%);
+  --fuchsia-900: hsl(296.7 63.6% 28%);
+  --fuchsia-950: hsl(296.8 90.2% 16.1%);
+
+  /* Pink */
+  --pink-50: hsl(327.3 73.3% 97.1%);
+  --pink-100: hsl(325.7 77.8% 94.7%);
+  --pink-200: hsl(325.9 84.6% 89.8%);
+  --pink-300: hsl(327.4 87.1% 81.8%);
+  --pink-400: hsl(328.6 85.5% 70.2%);
+  --pink-500: hsl(330.4 81.2% 60.4%);
+  --pink-600: hsl(333.3 71.4% 50.6%);
+  --pink-700: hsl(335.1 77.6% 42%);
+  --pink-800: hsl(335.8 74.4% 35.3%);
+  --pink-900: hsl(335.9 69% 30.4%);
+  --pink-950: hsl(336.2 83.9% 17.1%);
+
+  /* Rose */
+  --rose-50: hsl(355.7 100% 97.3%);
+  --rose-100: hsl(355.6 100% 94.7%);
+  --rose-200: hsl(352.7 96.1% 90%);
+  --rose-300: hsl(352.6 95.7% 81.8%);
+  --rose-400: hsl(351.3 94.5% 71.4%);
+  --rose-500: hsl(349.7 89.2% 60.2%);
+  --rose-600: hsl(346.8 77.2% 49.8%);
+  --rose-700: hsl(345.3 82.7% 40.8%);
+  --rose-800: hsl(343.4 79.7% 34.7%);
+  --rose-900: hsl(341.5 75.5% 30.4%);
+  --rose-950: hsl(343.1 87.7% 15.9%);
+}
+
+
+
+:root {
+  --hardware-pixel: 1px;
+}
+
+@media (min-resolution: 2dppx) {
+  :root {
+    --hardware-pixel: 0.5px;
+  }
+}
+
+@media (min-resolution: 3dppx) {
+  :root {
+    --hardware-pixel: 0.33333px;
+  }
+}
+
+@media (min-resolution: 4dppx) {
+  :root {
+    --hardware-pixel: 0.25px;
+  }
+}
+
+:root {
+  font-size: 12px;
+  --spacing-small: 3px;
+  --spacing-medium: 6px;
+  --spacing-large: 12px;
+  --spacing-x-large: 24px;
+}
+
+select {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+com-native-menu, button, select {
+  user-select: none;
+  white-space: nowrap;
+  padding: var(--spacing-small) var(--spacing-medium);
+  border-radius: 10px;
+  border-width: calc(2 * var(--hardware-pixel));
+  border-style: solid;
+  cursor: pointer;
+  border-color: var(--theme-control-border);
+  background-color: var(--theme-control-bg);
+  color: inherit;
+}
+
+com-native-menu {
+  /* for specificity */
+  /* No padding for this as we have a transparent
+  control below that needs to be clickable
+  even on the padding */
+  padding: 0;
+}
+
+com-native-menu:hover,
+select:hover,
+button:hover {
+  background-color: var(--theme-control-bg-hover);
+}
+
+com-native-menu[disabled], select[disabled], button[disabled] {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:has(> svg) {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-medium);
+}
+
+button:has(> svg) > * {
+  display: flex;
+}
+
+com-native-menu:focus-within,
+button:focus-visible,
+select:focus-visible {
+  background-color: var(--theme-control-bg-hover);
+  outline-style: solid;
+  outline-width: calc(3 * var(--hardware-pixel));
+  outline-color: var(--theme-control-border-focus);
+  z-index: 1;
+}
+
+/* Doesn't look good on Firefox - let's put it on the <p> */
+  [contenteditable].firefox:focus-visible {
+    outline-style: none;
+  }
+
+  p:has([contenteditable].firefox:focus-visible) {
+    outline-style: auto;
+  }
+/* -- */
+
+[tooltip] {
+  position: relative;
+}
+
+[tooltip]:not(:hover)::after {
+  opacity: 0;
+  transition-property: opacity;
+  transition-duration: 0s;
+  transition-delay: 0s;
+}
+
+[tooltip]:hover::after {
+  transition-delay: 500ms;
+}
+
+[tooltip]::after {
+  z-index: 4;
+  left: 50%;
+  bottom: -3px;
+  transform: translateX(-50%) translateY(100%);
+
+  content: attr(tooltip);
+  position: absolute;
+  text-align: center;
+  padding: var(--spacing-small) var(--spacing-medium);
+  min-width: 80px;
+  width: max-content;
+  max-width: 120px;
+  max-height: 120px;
+  overflow: hidden;
+  text-wrap: auto;
+  border-radius: 10px;
+  pointer-events: none;
+
+  opacity: 0.8;
+
+  background-color: light-dark(var(--neutral-950), var(--neutral-50));
+  color: light-dark(var(--neutral-50), var(--neutral-950));
+}
+
+[tooltip].tooltip-prevent-right-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(100%);
+}
+
+[tooltip].tooltip-prevent-bottom-edge::after {
+  transform: translateX(-50%) translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-left-and-bottom-edge::after {
+  right: unset;
+  left: 0%;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-right-and-bottom-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+  :host {
+    display: flex;
+  }
+
+  #face {
+    gap: var(--spacing-medium);
+    font-family: monospace;
+  }
+
+  #span_demuxer {
+    text-transform: uppercase;
+    font-size: 0.85rem;
+  }
+
+  #span_size {
+    font-size: 0.8rem;
+    border-radius: var(--spacing-small);
+    padding: var(--spacing-small);
+    border-width: var(--hardware-pixel);
+    border-style: solid;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  #span_size[quality="meh"] {
+    color: light-dark(var(--zinc-700), var(--zinc-200));
+    background-color: light-dark(var(--zinc-100), transparent);
+    border-color: var(--zinc-700);
+  }
+
+  #span_size[quality="good"] {
+    color: light-dark(var(--sky-700), var(--sky-200));
+    background-color: light-dark(var(--sky-100), transparent);
+    border-color: var(--sky-700);
+  }
+
+  #span_size[quality="very_good"] {
+    color: light-dark(var(--emerald-700), var(--emerald-200));
+    background-color: light-dark(var(--emerald-100), transparent);
+    border-color: var(--emerald-700);
+  }
+
+  #svg_chevron {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  
+#button_report_nomedia, #button_report, #button_reporting, #button_reported, #button_help, #button_show_translate {
+    display: none !important;
+}
+
+#box_account_not_linux, #p_leave_review {
+    display: none !important;
+}
+</style>
+  <com-native-menu id="menu_options">
+    <hbox slot="face" id="face" xalign="center">
+      <span id="span_demuxer"></span>
+      <span id="span_size"></span>
+      <svg id="svg_chevron" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="2 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+        <path d='m8 16 4 4 4-4M8 8l4-4 4 4'/>
+      </svg>
+    </hbox>
+  </com-native-menu>
+</template>
+
+    <template id="media-meta-template">
+  <style>
+
+  *, *::before, *::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+body {
+  line-height: 1.5;
+  text-size-adjust: none;
+  font-size: 1rem;
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  -webkit-font-smoothing: antialiased;
+  font-family: system-ui, sans-serif;
+}
+
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+
+a {
+  text-decoration-skip-ink: auto;
+  color: currentColor;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+}
+
+box, hbox, vbox, spacer, stack {
+  flex-shrink: 0;
+  display: flex;
+  /*
+    These are necessary really.
+    Otherwise set to min-*: auto, messing up flex logic.
+  */
+  min-height: 0;
+  min-width: 0;
+}
+
+hbox {
+  flex-flow: row;
+  text-overflow: ellipsis;
+}
+
+wrappable-text {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+vbox {
+  flex-flow: column;
+  /* Not sure why I had that at some point… */
+  /* width: 100%; */
+}
+
+stack {
+  position: relative;
+  overflow: hidden;
+}
+
+stack > * {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+[wrap] { flex-wrap: wrap }
+[stretch] { align-self: stretch }
+[hidden="true"] { display: none!important; }
+
+[flex] { display: flex }
+[flex="1"] { flex-grow: 1 }
+[flex="2"] { flex-grow: 2 }
+[flex="3"] { flex-grow: 3 }
+[flex="4"] { flex-grow: 4 }
+[flex="5"] { flex-grow: 5 }
+[flex="6"] { flex-grow: 6 }
+[flex="7"] { flex-grow: 7 }
+[flex="8"] { flex-grow: 8 }
+[flex="9"] { flex-grow: 9 }
+
+/* We don't use the align=… attribute. Browser engines map that into a text-align=center!!! */
+[xalign="start"] { align-items: flex-start }
+[xalign="center"] { align-items: center }
+[xalign="end"] { align-items: flex-end }
+[xalign="baseline"] { align-items: flex-baseline }
+[xalign="stretch"] { align-items: stretch }
+
+[pack="start"] { justify-content: flex-start }
+[pack="center"] { justify-content: center }
+[pack="end"] { justify-content: flex-end }
+
+/* DEBUG */
+
+[debug] hbox,
+[debug] vbox,
+[debug] box,
+[debug] spacer {
+  margin: 8px;
+  padding: 8px;
+  outline: 1px dashed black;
+  position: relative;
+}
+
+/* [debug] hbox { background: green; } */
+/* [debug] vbox { background: blue; } */
+/* [debug] spacer { background: yellow; } */
+/* [debug] box { background: orange; } */
+
+[debug] hbox:before,
+[debug] vbox:before,
+[debug] box:before {
+  position: absolute;
+  font-size: 6px;
+  top: 0; left: 0;
+  display: block;
+  content: attr(id);
+}
+
+/* From https://github.com/shadcn-ui/ui/issues/669 */
+
+/* Palette: https://tailwindcss.com/docs/customizing-colors */
+
+:root {
+  /* Slate */
+  --slate-50: hsl(210 40% 98%);
+  --slate-100: hsl(210 40% 96.1%);
+  --slate-200: hsl(214.3 31.8% 91.4%);
+  --slate-300: hsl(212.7 26.8% 83.9%);
+  --slate-400: hsl(215 20.2% 65.1%);
+  --slate-500: hsl(215.4 16.3% 46.9%);
+  --slate-600: hsl(215.3 19.3% 34.5%);
+  --slate-700: hsl(215.3 25% 26.7%);
+  --slate-800: hsl(217.2 32.6% 17.5%);
+  --slate-900: hsl(222.2 47.4% 11.2%);
+  --slate-950: hsl(228.6 84% 4.9%);
+
+  /* Gray */
+  --gray-50: hsl(210 20% 98%);
+  --gray-100: hsl(220 14.3% 95.9%);
+  --gray-200: hsl(220 13% 91%);
+  --gray-300: hsl(216 12.2% 83.9%);
+  --gray-400: hsl(217.9 10.6% 64.9%);
+  --gray-500: hsl(220 8.9% 46.1%);
+  --gray-600: hsl(215 13.8% 34.1%);
+  --gray-700: hsl(216.9 19.1% 26.7%);
+  --gray-800: hsl(215 27.9% 16.9%);
+  --gray-900: hsl(220.9 39.3% 11%);
+  --gray-950: hsl(224 71.4% 4.1%);
+
+  /* Zinc */
+  --zinc-50: hsl(0 0% 98%);
+  --zinc-100: hsl(240 4.8% 95.9%);
+  --zinc-200: hsl(240 5.9% 90%);
+  --zinc-300: hsl(240 4.9% 83.9%);
+  --zinc-400: hsl(240 5% 64.9%);
+  --zinc-500: hsl(240 3.8% 46.1%);
+  --zinc-600: hsl(240 5.2% 33.9%);
+  --zinc-700: hsl(240 5.3% 26.1%);
+  --zinc-800: hsl(240 3.7% 15.9%);
+  --zinc-900: hsl(240 5.9% 10%);
+  --zinc-950: hsl(240 10% 3.9%);
+
+  /* Neutral */
+  --neutral-50: hsl(0 0% 98%);
+  --neutral-100: hsl(0 0% 96.1%);
+  --neutral-200: hsl(0 0% 89.8%);
+  --neutral-300: hsl(0 0% 83.1%);
+  --neutral-400: hsl(0 0% 63.9%);
+  --neutral-500: hsl(0 0% 45.1%);
+  --neutral-600: hsl(0 0% 32.2%);
+  --neutral-700: hsl(0 0% 25.1%);
+  --neutral-800: hsl(0 0% 14.9%);
+  --neutral-900: hsl(0 0% 9%);
+  --neutral-950: hsl(0 0% 3.9%);
+
+  /* Stone */
+  --stone-50: hsl(60 9.1% 97.8%);
+  --stone-100: hsl(60 4.8% 95.9%);
+  --stone-200: hsl(20 5.9% 90%);
+  --stone-300: hsl(24 5.7% 82.9%);
+  --stone-400: hsl(24 5.4% 63.9%);
+  --stone-500: hsl(25 5.3% 44.7%);
+  --stone-600: hsl(33.3 5.5% 32.4%);
+  --stone-700: hsl(30 6.3% 25.1%);
+  --stone-800: hsl(12 6.5% 15.1%);
+  --stone-900: hsl(24 9.8% 10%);
+  --stone-950: hsl(20 14.3% 4.1%);
+
+  /* Red */
+  --red-50: hsl(0 85.7% 97.3%);
+  --red-100: hsl(0 93.3% 94.1%);
+  --red-200: hsl(0 96.3% 89.4%);
+  --red-300: hsl(0 93.5% 81.8%);
+  --red-400: hsl(0 90.6% 70.8%);
+  --red-500: hsl(0 84.2% 60.2%);
+  --red-600: hsl(0 72.2% 50.6%);
+  --red-700: hsl(0 73.7% 41.8%);
+  --red-800: hsl(0 70% 35.3%);
+  --red-900: hsl(0 62.8% 30.6%);
+  --red-950: hsl(0 74.7% 15.5%);
+
+  /* Orange */
+  --orange-50: hsl(33.3 100% 96.5%);
+  --orange-100: hsl(34.3 100% 91.8%);
+  --orange-200: hsl(32.1 97.7% 83.1%);
+  --orange-300: hsl(30.7 97.2% 72.4%);
+  --orange-400: hsl(27 96% 61%);
+  --orange-500: hsl(24.6 95% 53.1%);
+  --orange-600: hsl(20.5 90.2% 48.2%);
+  --orange-700: hsl(17.5 88.3% 40.4%);
+  --orange-800: hsl(15 79.1% 33.7%);
+  --orange-900: hsl(15.3 74.6% 27.8%);
+  --orange-950: hsl(13 81.1% 14.5%);
+
+  /* Amber */
+  --amber-50: hsl(48 100% 96.1%);
+  --amber-100: hsl(48 96.5% 88.8%);
+  --amber-200: hsl(48 96.6% 76.7%);
+  --amber-300: hsl(45.9 96.7% 64.5%);
+  --amber-400: hsl(43.3 96.4% 56.3%);
+  --amber-500: hsl(37.7 92.1% 50.2%);
+  --amber-600: hsl(32.1 94.6% 43.7%);
+  --amber-700: hsl(26 90.5% 37.1%);
+  --amber-800: hsl(22.7 82.5% 31.4%);
+  --amber-900: hsl(21.7 77.8% 26.5%);
+  --amber-950: hsl(20.9 91.7% 14.1%);
+
+  /* Yellow */
+  --yellow-50: hsl(54.5 91.7% 95.3%);
+  --yellow-100: hsl(54.9 96.7% 88%);
+  --yellow-200: hsl(52.8 98.3% 76.9%);
+  --yellow-300: hsl(50.4 97.8% 63.5%);
+  --yellow-400: hsl(47.9 95.8% 53.1%);
+  --yellow-500: hsl(45.4 93.4% 47.5%);
+  --yellow-600: hsl(40.6 96.1% 40.4%);
+  --yellow-700: hsl(35.5 91.7% 32.9%);
+  --yellow-800: hsl(31.8 81% 28.8%);
+  --yellow-900: hsl(28.4 72.5% 25.7%);
+  --yellow-950: hsl(26 83.3% 14.1%);
+
+  /* Lime */
+  --lime-50: hsl(78.3 92% 95.1%);
+  --lime-100: hsl(79.6 89.1% 89.2%);
+  --lime-200: hsl(80.9 88.5% 79.6%);
+  --lime-300: hsl(82 84.5% 67.1%);
+  --lime-400: hsl(82.7 78% 55.5%);
+  --lime-500: hsl(83.7 80.5% 44.3%);
+  --lime-600: hsl(84.8 85.2% 34.5%);
+  --lime-700: hsl(85.9 78.4% 27.3%);
+  --lime-800: hsl(86.3 69% 22.7%);
+  --lime-900: hsl(87.6 61.2% 20.2%);
+  --lime-950: hsl(89.3 80.4% 10%);
+
+  /* Green */
+  --green-50: hsl(138.5 76.5% 96.7%);
+  --green-100: hsl(140.6 84.2% 92.5%);
+  --green-200: hsl(141 78.9% 85.1%);
+  --green-300: hsl(141.7 76.6% 73.1%);
+  --green-400: hsl(141.9 69.2% 58%);
+  --green-500: hsl(142.1 70.6% 45.3%);
+  --green-600: hsl(142.1 76.2% 36.3%);
+  --green-700: hsl(142.4 71.8% 29.2%);
+  --green-800: hsl(142.8 64.2% 24.1%);
+  --green-900: hsl(143.8 61.2% 20.2%);
+  --green-950: hsl(144.9 80.4% 10%);
+
+  /* Emerald */
+  --emerald-50: hsl(151.8 81% 95.9%);
+  --emerald-100: hsl(149.3 80.4% 90%);
+  --emerald-200: hsl(152.4 76% 80.4%);
+  --emerald-300: hsl(156.2 71.6% 66.9%);
+  --emerald-400: hsl(158.1 64.4% 51.6%);
+  --emerald-500: hsl(160.1 84.1% 39.4%);
+  --emerald-600: hsl(161.4 93.5% 30.4%);
+  --emerald-700: hsl(162.9 93.5% 24.3%);
+  --emerald-800: hsl(163.1 88.1% 19.8%);
+  --emerald-900: hsl(164.2 85.7% 16.5%);
+  --emerald-950: hsl(165.7 91.3% 9%);
+
+  /* Teal */
+  --teal-50: hsl(166.2 76.5% 96.7%);
+  --teal-100: hsl(167.2 85.5% 89.2%);
+  --teal-200: hsl(168.4 83.8% 78.2%);
+  --teal-300: hsl(170.6 76.9% 64.3%);
+  --teal-400: hsl(172.5 66% 50.4%);
+  --teal-500: hsl(173.4 80.4% 40%);
+  --teal-600: hsl(174.7 83.9% 31.6%);
+  --teal-700: hsl(175.3 77.4% 26.1%);
+  --teal-800: hsl(176.1 69.4% 21.8%);
+  --teal-900: hsl(175.9 60.8% 19%);
+  --teal-950: hsl(178.6 84.3% 10%);
+
+  /* Cyan */
+  --cyan-50: hsl(183.2 100% 96.3%);
+  --cyan-100: hsl(185.1 95.9% 90.4%);
+  --cyan-200: hsl(186.2 93.5% 81.8%);
+  --cyan-300: hsl(187 92.4% 69%);
+  --cyan-400: hsl(187.9 85.7% 53.3%);
+  --cyan-500: hsl(188.7 94.5% 42.7%);
+  --cyan-600: hsl(191.6 91.4% 36.5%);
+  --cyan-700: hsl(192.9 82.3% 31%);
+  --cyan-800: hsl(194.4 69.6% 27.1%);
+  --cyan-900: hsl(196.4 63.6% 23.7%);
+  --cyan-950: hsl(197 78.9% 14.9%);
+
+  /* Sky */
+  --sky-50: hsl(204 100% 97.1%);
+  --sky-100: hsl(204 93.8% 93.7%);
+  --sky-200: hsl(200.6 94.4% 86.1%);
+  --sky-300: hsl(199.4 95.5% 73.9%);
+  --sky-400: hsl(198.4 93.2% 59.6%);
+  --sky-500: hsl(198.6 88.7% 48.4%);
+  --sky-600: hsl(200.4 98% 39.4%);
+  --sky-700: hsl(201.3 96.3% 32.2%);
+  --sky-800: hsl(201 90% 27.5%);
+  --sky-900: hsl(202 80.3% 23.9%);
+  --sky-950: hsl(204 80.2% 15.9%);
+
+  /* Blue */
+  --blue-50: hsl(213.8 100% 96.9%);
+  --blue-100: hsl(214.3 94.6% 92.7%);
+  --blue-200: hsl(213.3 96.9% 87.3%);
+  --blue-300: hsl(211.7 96.4% 78.4%);
+  --blue-400: hsl(213.1 93.9% 67.8%);
+  --blue-500: hsl(217.2 91.2% 59.8%);
+  --blue-600: hsl(221.2 83.2% 53.3%);
+  --blue-700: hsl(224.3 76.3% 48%);
+  --blue-800: hsl(225.9 70.7% 40.2%);
+  --blue-900: hsl(224.4 64.3% 32.9%);
+  --blue-950: hsl(226.2 57% 21%);
+
+  /* Indigo */
+  --indigo-50: hsl(225.9 100% 96.7%);
+  --indigo-100: hsl(226.5 100% 93.9%);
+  --indigo-200: hsl(228 96.5% 88.8%);
+  --indigo-300: hsl(229.7 93.5% 81.8%);
+  --indigo-400: hsl(234.5 89.5% 73.9%);
+  --indigo-500: hsl(238.7 83.5% 66.7%);
+  --indigo-600: hsl(243.4 75.4% 58.6%);
+  --indigo-700: hsl(244.5 57.9% 50.6%);
+  --indigo-800: hsl(243.7 54.5% 41.4%);
+  --indigo-900: hsl(242.2 47.4% 34.3%);
+  --indigo-950: hsl(243.8 47.1% 20%);
+
+  /* Violet */
+  --violet-50: hsl(250 100% 97.6%);
+  --violet-100: hsl(251.4 91.3% 95.5%);
+  --violet-200: hsl(250.5 95.2% 91.8%);
+  --violet-300: hsl(252.5 94.7% 85.1%);
+  --violet-400: hsl(255.1 91.7% 76.3%);
+  --violet-500: hsl(258.3 89.5% 66.3%);
+  --violet-600: hsl(262.1 83.3% 57.8%);
+  --violet-700: hsl(263.4 70% 50.4%);
+  --violet-800: hsl(263.4 69.3% 42.2%);
+  --violet-900: hsl(263.5 67.4% 34.9%);
+  --violet-950: hsl(261.2 72.6% 22.9%);
+
+  /* Purple */
+  --purple-50: hsl(270 100% 98%);
+  --purple-100: hsl(268.7 100% 95.5%);
+  --purple-200: hsl(268.6 100% 91.8%);
+  --purple-300: hsl(269.2 97.4% 85.1%);
+  --purple-400: hsl(270 95.2% 75.3%);
+  --purple-500: hsl(270.7 91% 65.1%);
+  --purple-600: hsl(271.5 81.3% 55.9%);
+  --purple-700: hsl(272.1 71.7% 47.1%);
+  --purple-800: hsl(272.9 67.2% 39.4%);
+  --purple-900: hsl(273.6 65.6% 32%);
+  --purple-950: hsl(273.5 86.9% 21%);
+
+  /* Fuchsia */
+  --fuchsia-50: hsl(289.1 100% 97.8%);
+  --fuchsia-100: hsl(287 100% 95.5%);
+  --fuchsia-200: hsl(288.3 95.8% 90.6%);
+  --fuchsia-300: hsl(291.1 93.1% 82.9%);
+  --fuchsia-400: hsl(292 91.4% 72.5%);
+  --fuchsia-500: hsl(292.2 84.1% 60.6%);
+  --fuchsia-600: hsl(293.4 69.5% 48.8%);
+  --fuchsia-700: hsl(294.7 72.4% 39.8%);
+  --fuchsia-800: hsl(295.4 70.2% 32.9%);
+  --fuchsia-900: hsl(296.7 63.6% 28%);
+  --fuchsia-950: hsl(296.8 90.2% 16.1%);
+
+  /* Pink */
+  --pink-50: hsl(327.3 73.3% 97.1%);
+  --pink-100: hsl(325.7 77.8% 94.7%);
+  --pink-200: hsl(325.9 84.6% 89.8%);
+  --pink-300: hsl(327.4 87.1% 81.8%);
+  --pink-400: hsl(328.6 85.5% 70.2%);
+  --pink-500: hsl(330.4 81.2% 60.4%);
+  --pink-600: hsl(333.3 71.4% 50.6%);
+  --pink-700: hsl(335.1 77.6% 42%);
+  --pink-800: hsl(335.8 74.4% 35.3%);
+  --pink-900: hsl(335.9 69% 30.4%);
+  --pink-950: hsl(336.2 83.9% 17.1%);
+
+  /* Rose */
+  --rose-50: hsl(355.7 100% 97.3%);
+  --rose-100: hsl(355.6 100% 94.7%);
+  --rose-200: hsl(352.7 96.1% 90%);
+  --rose-300: hsl(352.6 95.7% 81.8%);
+  --rose-400: hsl(351.3 94.5% 71.4%);
+  --rose-500: hsl(349.7 89.2% 60.2%);
+  --rose-600: hsl(346.8 77.2% 49.8%);
+  --rose-700: hsl(345.3 82.7% 40.8%);
+  --rose-800: hsl(343.4 79.7% 34.7%);
+  --rose-900: hsl(341.5 75.5% 30.4%);
+  --rose-950: hsl(343.1 87.7% 15.9%);
+}
+
+
+
+:root {
+  --hardware-pixel: 1px;
+}
+
+@media (min-resolution: 2dppx) {
+  :root {
+    --hardware-pixel: 0.5px;
+  }
+}
+
+@media (min-resolution: 3dppx) {
+  :root {
+    --hardware-pixel: 0.33333px;
+  }
+}
+
+@media (min-resolution: 4dppx) {
+  :root {
+    --hardware-pixel: 0.25px;
+  }
+}
+
+:root {
+  font-size: 12px;
+  --spacing-small: 3px;
+  --spacing-medium: 6px;
+  --spacing-large: 12px;
+  --spacing-x-large: 24px;
+}
+
+select {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+com-native-menu, button, select {
+  user-select: none;
+  white-space: nowrap;
+  padding: var(--spacing-small) var(--spacing-medium);
+  border-radius: 10px;
+  border-width: calc(2 * var(--hardware-pixel));
+  border-style: solid;
+  cursor: pointer;
+  border-color: var(--theme-control-border);
+  background-color: var(--theme-control-bg);
+  color: inherit;
+}
+
+com-native-menu {
+  /* for specificity */
+  /* No padding for this as we have a transparent
+  control below that needs to be clickable
+  even on the padding */
+  padding: 0;
+}
+
+com-native-menu:hover,
+select:hover,
+button:hover {
+  background-color: var(--theme-control-bg-hover);
+}
+
+com-native-menu[disabled], select[disabled], button[disabled] {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:has(> svg) {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-medium);
+}
+
+button:has(> svg) > * {
+  display: flex;
+}
+
+com-native-menu:focus-within,
+button:focus-visible,
+select:focus-visible {
+  background-color: var(--theme-control-bg-hover);
+  outline-style: solid;
+  outline-width: calc(3 * var(--hardware-pixel));
+  outline-color: var(--theme-control-border-focus);
+  z-index: 1;
+}
+
+/* Doesn't look good on Firefox - let's put it on the <p> */
+  [contenteditable].firefox:focus-visible {
+    outline-style: none;
+  }
+
+  p:has([contenteditable].firefox:focus-visible) {
+    outline-style: auto;
+  }
+/* -- */
+
+[tooltip] {
+  position: relative;
+}
+
+[tooltip]:not(:hover)::after {
+  opacity: 0;
+  transition-property: opacity;
+  transition-duration: 0s;
+  transition-delay: 0s;
+}
+
+[tooltip]:hover::after {
+  transition-delay: 500ms;
+}
+
+[tooltip]::after {
+  z-index: 4;
+  left: 50%;
+  bottom: -3px;
+  transform: translateX(-50%) translateY(100%);
+
+  content: attr(tooltip);
+  position: absolute;
+  text-align: center;
+  padding: var(--spacing-small) var(--spacing-medium);
+  min-width: 80px;
+  width: max-content;
+  max-width: 120px;
+  max-height: 120px;
+  overflow: hidden;
+  text-wrap: auto;
+  border-radius: 10px;
+  pointer-events: none;
+
+  opacity: 0.8;
+
+  background-color: light-dark(var(--neutral-950), var(--neutral-50));
+  color: light-dark(var(--neutral-50), var(--neutral-950));
+}
+
+[tooltip].tooltip-prevent-right-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(100%);
+}
+
+[tooltip].tooltip-prevent-bottom-edge::after {
+  transform: translateX(-50%) translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-left-and-bottom-edge::after {
+  right: unset;
+  left: 0%;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-right-and-bottom-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+  :host {
+    display: flex;
+  }
+
+  #hbox_meta {
+    padding: 0 var(--spacing-medium);
+    border-radius: var(--spacing-small);
+    gap: var(--spacing-small);
+    pointer-events: none;
+
+    /* no theme */
+    background-color: var(--neutral-950);
+    color: var(--neutral-50);
+  }
+
+  #div_favicon {
+    background-repeat: no-repeat;
+    background-size: 16px 16px;
+    background-position: center;
+    width: 16px;
+    height: 16px;
+    min-height: 16px;
+  }
+
+  #p_star > svg {
+    fill: var(--amber-300);
+    stroke: black;
+    width: 16px;
+    height: 16px;
+  }
+
+  
+#button_report_nomedia, #button_report, #button_reporting, #button_reported, #button_help, #button_show_translate {
+    display: none !important;
+}
+
+#box_account_not_linux, #p_leave_review {
+    display: none !important;
+}
+</style>
+  <hbox xalign="center" id="hbox_meta">
+    <div id="div_favicon"></div>
+    <p id="p_star">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+        <path d='M12.854 3.5a.979.979 0 0 0-1.708 0q-.3.546-.577 1.106a27 27 0 0 0-1.48 3.656c-.139.431-.551.73-1.023.743a29.4 29.4 0 0 0-4.267.425c-.774.136-1.065 1.018-.515 1.556q.188.185.38.365a32 32 0 0 0 3.03 2.527c.367.269.518.73.378 1.152a27 27 0 0 0-1.14 4.927c-.1.755.708 1.288 1.41.928a28.6 28.6 0 0 0 3.98-2.472 1.15 1.15 0 0 1 1.356 0 28.5 28.5 0 0 0 3.98 2.472c.701.36 1.51-.173 1.41-.928q-.058-.425-.127-.845a27 27 0 0 0-1.013-4.082c-.14-.422.01-.883.378-1.152a31.5 31.5 0 0 0 3.41-2.892c.55-.538.26-1.42-.515-1.556a29 29 0 0 0-4.267-.425 1.1 1.1 0 0 1-1.023-.743 27 27 0 0 0-2.057-4.761'/>
+      </svg>
+    </p>
+    <p id="p_duration"></p>
+    <p id="p_size"></p>
+  </hbox>
+</template>
+
+    <template id="media-tags-template">
+  <style>
+
+  *, *::before, *::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+body {
+  line-height: 1.5;
+  text-size-adjust: none;
+  font-size: 1rem;
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  -webkit-font-smoothing: antialiased;
+  font-family: system-ui, sans-serif;
+}
+
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+
+a {
+  text-decoration-skip-ink: auto;
+  color: currentColor;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+}
+
+box, hbox, vbox, spacer, stack {
+  flex-shrink: 0;
+  display: flex;
+  /*
+    These are necessary really.
+    Otherwise set to min-*: auto, messing up flex logic.
+  */
+  min-height: 0;
+  min-width: 0;
+}
+
+hbox {
+  flex-flow: row;
+  text-overflow: ellipsis;
+}
+
+wrappable-text {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+vbox {
+  flex-flow: column;
+  /* Not sure why I had that at some point… */
+  /* width: 100%; */
+}
+
+stack {
+  position: relative;
+  overflow: hidden;
+}
+
+stack > * {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+[wrap] { flex-wrap: wrap }
+[stretch] { align-self: stretch }
+[hidden="true"] { display: none!important; }
+
+[flex] { display: flex }
+[flex="1"] { flex-grow: 1 }
+[flex="2"] { flex-grow: 2 }
+[flex="3"] { flex-grow: 3 }
+[flex="4"] { flex-grow: 4 }
+[flex="5"] { flex-grow: 5 }
+[flex="6"] { flex-grow: 6 }
+[flex="7"] { flex-grow: 7 }
+[flex="8"] { flex-grow: 8 }
+[flex="9"] { flex-grow: 9 }
+
+/* We don't use the align=… attribute. Browser engines map that into a text-align=center!!! */
+[xalign="start"] { align-items: flex-start }
+[xalign="center"] { align-items: center }
+[xalign="end"] { align-items: flex-end }
+[xalign="baseline"] { align-items: flex-baseline }
+[xalign="stretch"] { align-items: stretch }
+
+[pack="start"] { justify-content: flex-start }
+[pack="center"] { justify-content: center }
+[pack="end"] { justify-content: flex-end }
+
+/* DEBUG */
+
+[debug] hbox,
+[debug] vbox,
+[debug] box,
+[debug] spacer {
+  margin: 8px;
+  padding: 8px;
+  outline: 1px dashed black;
+  position: relative;
+}
+
+/* [debug] hbox { background: green; } */
+/* [debug] vbox { background: blue; } */
+/* [debug] spacer { background: yellow; } */
+/* [debug] box { background: orange; } */
+
+[debug] hbox:before,
+[debug] vbox:before,
+[debug] box:before {
+  position: absolute;
+  font-size: 6px;
+  top: 0; left: 0;
+  display: block;
+  content: attr(id);
+}
+
+/* From https://github.com/shadcn-ui/ui/issues/669 */
+
+/* Palette: https://tailwindcss.com/docs/customizing-colors */
+
+:root {
+  /* Slate */
+  --slate-50: hsl(210 40% 98%);
+  --slate-100: hsl(210 40% 96.1%);
+  --slate-200: hsl(214.3 31.8% 91.4%);
+  --slate-300: hsl(212.7 26.8% 83.9%);
+  --slate-400: hsl(215 20.2% 65.1%);
+  --slate-500: hsl(215.4 16.3% 46.9%);
+  --slate-600: hsl(215.3 19.3% 34.5%);
+  --slate-700: hsl(215.3 25% 26.7%);
+  --slate-800: hsl(217.2 32.6% 17.5%);
+  --slate-900: hsl(222.2 47.4% 11.2%);
+  --slate-950: hsl(228.6 84% 4.9%);
+
+  /* Gray */
+  --gray-50: hsl(210 20% 98%);
+  --gray-100: hsl(220 14.3% 95.9%);
+  --gray-200: hsl(220 13% 91%);
+  --gray-300: hsl(216 12.2% 83.9%);
+  --gray-400: hsl(217.9 10.6% 64.9%);
+  --gray-500: hsl(220 8.9% 46.1%);
+  --gray-600: hsl(215 13.8% 34.1%);
+  --gray-700: hsl(216.9 19.1% 26.7%);
+  --gray-800: hsl(215 27.9% 16.9%);
+  --gray-900: hsl(220.9 39.3% 11%);
+  --gray-950: hsl(224 71.4% 4.1%);
+
+  /* Zinc */
+  --zinc-50: hsl(0 0% 98%);
+  --zinc-100: hsl(240 4.8% 95.9%);
+  --zinc-200: hsl(240 5.9% 90%);
+  --zinc-300: hsl(240 4.9% 83.9%);
+  --zinc-400: hsl(240 5% 64.9%);
+  --zinc-500: hsl(240 3.8% 46.1%);
+  --zinc-600: hsl(240 5.2% 33.9%);
+  --zinc-700: hsl(240 5.3% 26.1%);
+  --zinc-800: hsl(240 3.7% 15.9%);
+  --zinc-900: hsl(240 5.9% 10%);
+  --zinc-950: hsl(240 10% 3.9%);
+
+  /* Neutral */
+  --neutral-50: hsl(0 0% 98%);
+  --neutral-100: hsl(0 0% 96.1%);
+  --neutral-200: hsl(0 0% 89.8%);
+  --neutral-300: hsl(0 0% 83.1%);
+  --neutral-400: hsl(0 0% 63.9%);
+  --neutral-500: hsl(0 0% 45.1%);
+  --neutral-600: hsl(0 0% 32.2%);
+  --neutral-700: hsl(0 0% 25.1%);
+  --neutral-800: hsl(0 0% 14.9%);
+  --neutral-900: hsl(0 0% 9%);
+  --neutral-950: hsl(0 0% 3.9%);
+
+  /* Stone */
+  --stone-50: hsl(60 9.1% 97.8%);
+  --stone-100: hsl(60 4.8% 95.9%);
+  --stone-200: hsl(20 5.9% 90%);
+  --stone-300: hsl(24 5.7% 82.9%);
+  --stone-400: hsl(24 5.4% 63.9%);
+  --stone-500: hsl(25 5.3% 44.7%);
+  --stone-600: hsl(33.3 5.5% 32.4%);
+  --stone-700: hsl(30 6.3% 25.1%);
+  --stone-800: hsl(12 6.5% 15.1%);
+  --stone-900: hsl(24 9.8% 10%);
+  --stone-950: hsl(20 14.3% 4.1%);
+
+  /* Red */
+  --red-50: hsl(0 85.7% 97.3%);
+  --red-100: hsl(0 93.3% 94.1%);
+  --red-200: hsl(0 96.3% 89.4%);
+  --red-300: hsl(0 93.5% 81.8%);
+  --red-400: hsl(0 90.6% 70.8%);
+  --red-500: hsl(0 84.2% 60.2%);
+  --red-600: hsl(0 72.2% 50.6%);
+  --red-700: hsl(0 73.7% 41.8%);
+  --red-800: hsl(0 70% 35.3%);
+  --red-900: hsl(0 62.8% 30.6%);
+  --red-950: hsl(0 74.7% 15.5%);
+
+  /* Orange */
+  --orange-50: hsl(33.3 100% 96.5%);
+  --orange-100: hsl(34.3 100% 91.8%);
+  --orange-200: hsl(32.1 97.7% 83.1%);
+  --orange-300: hsl(30.7 97.2% 72.4%);
+  --orange-400: hsl(27 96% 61%);
+  --orange-500: hsl(24.6 95% 53.1%);
+  --orange-600: hsl(20.5 90.2% 48.2%);
+  --orange-700: hsl(17.5 88.3% 40.4%);
+  --orange-800: hsl(15 79.1% 33.7%);
+  --orange-900: hsl(15.3 74.6% 27.8%);
+  --orange-950: hsl(13 81.1% 14.5%);
+
+  /* Amber */
+  --amber-50: hsl(48 100% 96.1%);
+  --amber-100: hsl(48 96.5% 88.8%);
+  --amber-200: hsl(48 96.6% 76.7%);
+  --amber-300: hsl(45.9 96.7% 64.5%);
+  --amber-400: hsl(43.3 96.4% 56.3%);
+  --amber-500: hsl(37.7 92.1% 50.2%);
+  --amber-600: hsl(32.1 94.6% 43.7%);
+  --amber-700: hsl(26 90.5% 37.1%);
+  --amber-800: hsl(22.7 82.5% 31.4%);
+  --amber-900: hsl(21.7 77.8% 26.5%);
+  --amber-950: hsl(20.9 91.7% 14.1%);
+
+  /* Yellow */
+  --yellow-50: hsl(54.5 91.7% 95.3%);
+  --yellow-100: hsl(54.9 96.7% 88%);
+  --yellow-200: hsl(52.8 98.3% 76.9%);
+  --yellow-300: hsl(50.4 97.8% 63.5%);
+  --yellow-400: hsl(47.9 95.8% 53.1%);
+  --yellow-500: hsl(45.4 93.4% 47.5%);
+  --yellow-600: hsl(40.6 96.1% 40.4%);
+  --yellow-700: hsl(35.5 91.7% 32.9%);
+  --yellow-800: hsl(31.8 81% 28.8%);
+  --yellow-900: hsl(28.4 72.5% 25.7%);
+  --yellow-950: hsl(26 83.3% 14.1%);
+
+  /* Lime */
+  --lime-50: hsl(78.3 92% 95.1%);
+  --lime-100: hsl(79.6 89.1% 89.2%);
+  --lime-200: hsl(80.9 88.5% 79.6%);
+  --lime-300: hsl(82 84.5% 67.1%);
+  --lime-400: hsl(82.7 78% 55.5%);
+  --lime-500: hsl(83.7 80.5% 44.3%);
+  --lime-600: hsl(84.8 85.2% 34.5%);
+  --lime-700: hsl(85.9 78.4% 27.3%);
+  --lime-800: hsl(86.3 69% 22.7%);
+  --lime-900: hsl(87.6 61.2% 20.2%);
+  --lime-950: hsl(89.3 80.4% 10%);
+
+  /* Green */
+  --green-50: hsl(138.5 76.5% 96.7%);
+  --green-100: hsl(140.6 84.2% 92.5%);
+  --green-200: hsl(141 78.9% 85.1%);
+  --green-300: hsl(141.7 76.6% 73.1%);
+  --green-400: hsl(141.9 69.2% 58%);
+  --green-500: hsl(142.1 70.6% 45.3%);
+  --green-600: hsl(142.1 76.2% 36.3%);
+  --green-700: hsl(142.4 71.8% 29.2%);
+  --green-800: hsl(142.8 64.2% 24.1%);
+  --green-900: hsl(143.8 61.2% 20.2%);
+  --green-950: hsl(144.9 80.4% 10%);
+
+  /* Emerald */
+  --emerald-50: hsl(151.8 81% 95.9%);
+  --emerald-100: hsl(149.3 80.4% 90%);
+  --emerald-200: hsl(152.4 76% 80.4%);
+  --emerald-300: hsl(156.2 71.6% 66.9%);
+  --emerald-400: hsl(158.1 64.4% 51.6%);
+  --emerald-500: hsl(160.1 84.1% 39.4%);
+  --emerald-600: hsl(161.4 93.5% 30.4%);
+  --emerald-700: hsl(162.9 93.5% 24.3%);
+  --emerald-800: hsl(163.1 88.1% 19.8%);
+  --emerald-900: hsl(164.2 85.7% 16.5%);
+  --emerald-950: hsl(165.7 91.3% 9%);
+
+  /* Teal */
+  --teal-50: hsl(166.2 76.5% 96.7%);
+  --teal-100: hsl(167.2 85.5% 89.2%);
+  --teal-200: hsl(168.4 83.8% 78.2%);
+  --teal-300: hsl(170.6 76.9% 64.3%);
+  --teal-400: hsl(172.5 66% 50.4%);
+  --teal-500: hsl(173.4 80.4% 40%);
+  --teal-600: hsl(174.7 83.9% 31.6%);
+  --teal-700: hsl(175.3 77.4% 26.1%);
+  --teal-800: hsl(176.1 69.4% 21.8%);
+  --teal-900: hsl(175.9 60.8% 19%);
+  --teal-950: hsl(178.6 84.3% 10%);
+
+  /* Cyan */
+  --cyan-50: hsl(183.2 100% 96.3%);
+  --cyan-100: hsl(185.1 95.9% 90.4%);
+  --cyan-200: hsl(186.2 93.5% 81.8%);
+  --cyan-300: hsl(187 92.4% 69%);
+  --cyan-400: hsl(187.9 85.7% 53.3%);
+  --cyan-500: hsl(188.7 94.5% 42.7%);
+  --cyan-600: hsl(191.6 91.4% 36.5%);
+  --cyan-700: hsl(192.9 82.3% 31%);
+  --cyan-800: hsl(194.4 69.6% 27.1%);
+  --cyan-900: hsl(196.4 63.6% 23.7%);
+  --cyan-950: hsl(197 78.9% 14.9%);
+
+  /* Sky */
+  --sky-50: hsl(204 100% 97.1%);
+  --sky-100: hsl(204 93.8% 93.7%);
+  --sky-200: hsl(200.6 94.4% 86.1%);
+  --sky-300: hsl(199.4 95.5% 73.9%);
+  --sky-400: hsl(198.4 93.2% 59.6%);
+  --sky-500: hsl(198.6 88.7% 48.4%);
+  --sky-600: hsl(200.4 98% 39.4%);
+  --sky-700: hsl(201.3 96.3% 32.2%);
+  --sky-800: hsl(201 90% 27.5%);
+  --sky-900: hsl(202 80.3% 23.9%);
+  --sky-950: hsl(204 80.2% 15.9%);
+
+  /* Blue */
+  --blue-50: hsl(213.8 100% 96.9%);
+  --blue-100: hsl(214.3 94.6% 92.7%);
+  --blue-200: hsl(213.3 96.9% 87.3%);
+  --blue-300: hsl(211.7 96.4% 78.4%);
+  --blue-400: hsl(213.1 93.9% 67.8%);
+  --blue-500: hsl(217.2 91.2% 59.8%);
+  --blue-600: hsl(221.2 83.2% 53.3%);
+  --blue-700: hsl(224.3 76.3% 48%);
+  --blue-800: hsl(225.9 70.7% 40.2%);
+  --blue-900: hsl(224.4 64.3% 32.9%);
+  --blue-950: hsl(226.2 57% 21%);
+
+  /* Indigo */
+  --indigo-50: hsl(225.9 100% 96.7%);
+  --indigo-100: hsl(226.5 100% 93.9%);
+  --indigo-200: hsl(228 96.5% 88.8%);
+  --indigo-300: hsl(229.7 93.5% 81.8%);
+  --indigo-400: hsl(234.5 89.5% 73.9%);
+  --indigo-500: hsl(238.7 83.5% 66.7%);
+  --indigo-600: hsl(243.4 75.4% 58.6%);
+  --indigo-700: hsl(244.5 57.9% 50.6%);
+  --indigo-800: hsl(243.7 54.5% 41.4%);
+  --indigo-900: hsl(242.2 47.4% 34.3%);
+  --indigo-950: hsl(243.8 47.1% 20%);
+
+  /* Violet */
+  --violet-50: hsl(250 100% 97.6%);
+  --violet-100: hsl(251.4 91.3% 95.5%);
+  --violet-200: hsl(250.5 95.2% 91.8%);
+  --violet-300: hsl(252.5 94.7% 85.1%);
+  --violet-400: hsl(255.1 91.7% 76.3%);
+  --violet-500: hsl(258.3 89.5% 66.3%);
+  --violet-600: hsl(262.1 83.3% 57.8%);
+  --violet-700: hsl(263.4 70% 50.4%);
+  --violet-800: hsl(263.4 69.3% 42.2%);
+  --violet-900: hsl(263.5 67.4% 34.9%);
+  --violet-950: hsl(261.2 72.6% 22.9%);
+
+  /* Purple */
+  --purple-50: hsl(270 100% 98%);
+  --purple-100: hsl(268.7 100% 95.5%);
+  --purple-200: hsl(268.6 100% 91.8%);
+  --purple-300: hsl(269.2 97.4% 85.1%);
+  --purple-400: hsl(270 95.2% 75.3%);
+  --purple-500: hsl(270.7 91% 65.1%);
+  --purple-600: hsl(271.5 81.3% 55.9%);
+  --purple-700: hsl(272.1 71.7% 47.1%);
+  --purple-800: hsl(272.9 67.2% 39.4%);
+  --purple-900: hsl(273.6 65.6% 32%);
+  --purple-950: hsl(273.5 86.9% 21%);
+
+  /* Fuchsia */
+  --fuchsia-50: hsl(289.1 100% 97.8%);
+  --fuchsia-100: hsl(287 100% 95.5%);
+  --fuchsia-200: hsl(288.3 95.8% 90.6%);
+  --fuchsia-300: hsl(291.1 93.1% 82.9%);
+  --fuchsia-400: hsl(292 91.4% 72.5%);
+  --fuchsia-500: hsl(292.2 84.1% 60.6%);
+  --fuchsia-600: hsl(293.4 69.5% 48.8%);
+  --fuchsia-700: hsl(294.7 72.4% 39.8%);
+  --fuchsia-800: hsl(295.4 70.2% 32.9%);
+  --fuchsia-900: hsl(296.7 63.6% 28%);
+  --fuchsia-950: hsl(296.8 90.2% 16.1%);
+
+  /* Pink */
+  --pink-50: hsl(327.3 73.3% 97.1%);
+  --pink-100: hsl(325.7 77.8% 94.7%);
+  --pink-200: hsl(325.9 84.6% 89.8%);
+  --pink-300: hsl(327.4 87.1% 81.8%);
+  --pink-400: hsl(328.6 85.5% 70.2%);
+  --pink-500: hsl(330.4 81.2% 60.4%);
+  --pink-600: hsl(333.3 71.4% 50.6%);
+  --pink-700: hsl(335.1 77.6% 42%);
+  --pink-800: hsl(335.8 74.4% 35.3%);
+  --pink-900: hsl(335.9 69% 30.4%);
+  --pink-950: hsl(336.2 83.9% 17.1%);
+
+  /* Rose */
+  --rose-50: hsl(355.7 100% 97.3%);
+  --rose-100: hsl(355.6 100% 94.7%);
+  --rose-200: hsl(352.7 96.1% 90%);
+  --rose-300: hsl(352.6 95.7% 81.8%);
+  --rose-400: hsl(351.3 94.5% 71.4%);
+  --rose-500: hsl(349.7 89.2% 60.2%);
+  --rose-600: hsl(346.8 77.2% 49.8%);
+  --rose-700: hsl(345.3 82.7% 40.8%);
+  --rose-800: hsl(343.4 79.7% 34.7%);
+  --rose-900: hsl(341.5 75.5% 30.4%);
+  --rose-950: hsl(343.1 87.7% 15.9%);
+}
+
+
+
+:root {
+  --hardware-pixel: 1px;
+}
+
+@media (min-resolution: 2dppx) {
+  :root {
+    --hardware-pixel: 0.5px;
+  }
+}
+
+@media (min-resolution: 3dppx) {
+  :root {
+    --hardware-pixel: 0.33333px;
+  }
+}
+
+@media (min-resolution: 4dppx) {
+  :root {
+    --hardware-pixel: 0.25px;
+  }
+}
+
+:root {
+  font-size: 12px;
+  --spacing-small: 3px;
+  --spacing-medium: 6px;
+  --spacing-large: 12px;
+  --spacing-x-large: 24px;
+}
+
+select {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+com-native-menu, button, select {
+  user-select: none;
+  white-space: nowrap;
+  padding: var(--spacing-small) var(--spacing-medium);
+  border-radius: 10px;
+  border-width: calc(2 * var(--hardware-pixel));
+  border-style: solid;
+  cursor: pointer;
+  border-color: var(--theme-control-border);
+  background-color: var(--theme-control-bg);
+  color: inherit;
+}
+
+com-native-menu {
+  /* for specificity */
+  /* No padding for this as we have a transparent
+  control below that needs to be clickable
+  even on the padding */
+  padding: 0;
+}
+
+com-native-menu:hover,
+select:hover,
+button:hover {
+  background-color: var(--theme-control-bg-hover);
+}
+
+com-native-menu[disabled], select[disabled], button[disabled] {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:has(> svg) {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-medium);
+}
+
+button:has(> svg) > * {
+  display: flex;
+}
+
+com-native-menu:focus-within,
+button:focus-visible,
+select:focus-visible {
+  background-color: var(--theme-control-bg-hover);
+  outline-style: solid;
+  outline-width: calc(3 * var(--hardware-pixel));
+  outline-color: var(--theme-control-border-focus);
+  z-index: 1;
+}
+
+/* Doesn't look good on Firefox - let's put it on the <p> */
+  [contenteditable].firefox:focus-visible {
+    outline-style: none;
+  }
+
+  p:has([contenteditable].firefox:focus-visible) {
+    outline-style: auto;
+  }
+/* -- */
+
+[tooltip] {
+  position: relative;
+}
+
+[tooltip]:not(:hover)::after {
+  opacity: 0;
+  transition-property: opacity;
+  transition-duration: 0s;
+  transition-delay: 0s;
+}
+
+[tooltip]:hover::after {
+  transition-delay: 500ms;
+}
+
+[tooltip]::after {
+  z-index: 4;
+  left: 50%;
+  bottom: -3px;
+  transform: translateX(-50%) translateY(100%);
+
+  content: attr(tooltip);
+  position: absolute;
+  text-align: center;
+  padding: var(--spacing-small) var(--spacing-medium);
+  min-width: 80px;
+  width: max-content;
+  max-width: 120px;
+  max-height: 120px;
+  overflow: hidden;
+  text-wrap: auto;
+  border-radius: 10px;
+  pointer-events: none;
+
+  opacity: 0.8;
+
+  background-color: light-dark(var(--neutral-950), var(--neutral-50));
+  color: light-dark(var(--neutral-50), var(--neutral-950));
+}
+
+[tooltip].tooltip-prevent-right-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(100%);
+}
+
+[tooltip].tooltip-prevent-bottom-edge::after {
+  transform: translateX(-50%) translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-left-and-bottom-edge::after {
+  right: unset;
+  left: 0%;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-right-and-bottom-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+  :host, svg {
+    display: inline;
+  }
+
+  span {
+    font-size: 0.7rem;
+    padding: 0 3px;
+
+    text-transform: uppercase;
+    font-family: monospace;
+    vertical-align: bottom;
+
+    border-width: var(--hardware-pixel);
+    border-style: solid;
+    border-radius: 3px;
+
+    border-color: var(--sky-700);
+
+    color: light-dark(var(--sky-700), var(--sky-200));
+    background-color: light-dark(var(--sky-100), transparent);
+  }
+
+  
+#button_report_nomedia, #button_report, #button_reporting, #button_reported, #button_help, #button_show_translate {
+    display: none !important;
+}
+
+#box_account_not_linux, #p_leave_review {
+    display: none !important;
+}
+</style>
+
+  <span id="tag_hls" hidden="true">hls</span>
+  <span id="tag_m3u8" hidden="true">m3u8</span>
+  <span id="tag_http" hidden="true">http</span>
+  <span id="tag_yt" hidden="true">fmt</span>
+  <span id="tag_mpd" hidden="true">mpd</span>
+</template>
+
+    <template id="media-button-origin">
+  <style>
+
+  *, *::before, *::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+body {
+  line-height: 1.5;
+  text-size-adjust: none;
+  font-size: 1rem;
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  -webkit-font-smoothing: antialiased;
+  font-family: system-ui, sans-serif;
+}
+
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+
+a {
+  text-decoration-skip-ink: auto;
+  color: currentColor;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  height: 100vh;
+}
+
+box, hbox, vbox, spacer, stack {
+  flex-shrink: 0;
+  display: flex;
+  /*
+    These are necessary really.
+    Otherwise set to min-*: auto, messing up flex logic.
+  */
+  min-height: 0;
+  min-width: 0;
+}
+
+hbox {
+  flex-flow: row;
+  text-overflow: ellipsis;
+}
+
+wrappable-text {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+vbox {
+  flex-flow: column;
+  /* Not sure why I had that at some point… */
+  /* width: 100%; */
+}
+
+stack {
+  position: relative;
+  overflow: hidden;
+}
+
+stack > * {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+[wrap] { flex-wrap: wrap }
+[stretch] { align-self: stretch }
+[hidden="true"] { display: none!important; }
+
+[flex] { display: flex }
+[flex="1"] { flex-grow: 1 }
+[flex="2"] { flex-grow: 2 }
+[flex="3"] { flex-grow: 3 }
+[flex="4"] { flex-grow: 4 }
+[flex="5"] { flex-grow: 5 }
+[flex="6"] { flex-grow: 6 }
+[flex="7"] { flex-grow: 7 }
+[flex="8"] { flex-grow: 8 }
+[flex="9"] { flex-grow: 9 }
+
+/* We don't use the align=… attribute. Browser engines map that into a text-align=center!!! */
+[xalign="start"] { align-items: flex-start }
+[xalign="center"] { align-items: center }
+[xalign="end"] { align-items: flex-end }
+[xalign="baseline"] { align-items: flex-baseline }
+[xalign="stretch"] { align-items: stretch }
+
+[pack="start"] { justify-content: flex-start }
+[pack="center"] { justify-content: center }
+[pack="end"] { justify-content: flex-end }
+
+/* DEBUG */
+
+[debug] hbox,
+[debug] vbox,
+[debug] box,
+[debug] spacer {
+  margin: 8px;
+  padding: 8px;
+  outline: 1px dashed black;
+  position: relative;
+}
+
+/* [debug] hbox { background: green; } */
+/* [debug] vbox { background: blue; } */
+/* [debug] spacer { background: yellow; } */
+/* [debug] box { background: orange; } */
+
+[debug] hbox:before,
+[debug] vbox:before,
+[debug] box:before {
+  position: absolute;
+  font-size: 6px;
+  top: 0; left: 0;
+  display: block;
+  content: attr(id);
+}
+
+/* From https://github.com/shadcn-ui/ui/issues/669 */
+
+/* Palette: https://tailwindcss.com/docs/customizing-colors */
+
+:root {
+  /* Slate */
+  --slate-50: hsl(210 40% 98%);
+  --slate-100: hsl(210 40% 96.1%);
+  --slate-200: hsl(214.3 31.8% 91.4%);
+  --slate-300: hsl(212.7 26.8% 83.9%);
+  --slate-400: hsl(215 20.2% 65.1%);
+  --slate-500: hsl(215.4 16.3% 46.9%);
+  --slate-600: hsl(215.3 19.3% 34.5%);
+  --slate-700: hsl(215.3 25% 26.7%);
+  --slate-800: hsl(217.2 32.6% 17.5%);
+  --slate-900: hsl(222.2 47.4% 11.2%);
+  --slate-950: hsl(228.6 84% 4.9%);
+
+  /* Gray */
+  --gray-50: hsl(210 20% 98%);
+  --gray-100: hsl(220 14.3% 95.9%);
+  --gray-200: hsl(220 13% 91%);
+  --gray-300: hsl(216 12.2% 83.9%);
+  --gray-400: hsl(217.9 10.6% 64.9%);
+  --gray-500: hsl(220 8.9% 46.1%);
+  --gray-600: hsl(215 13.8% 34.1%);
+  --gray-700: hsl(216.9 19.1% 26.7%);
+  --gray-800: hsl(215 27.9% 16.9%);
+  --gray-900: hsl(220.9 39.3% 11%);
+  --gray-950: hsl(224 71.4% 4.1%);
+
+  /* Zinc */
+  --zinc-50: hsl(0 0% 98%);
+  --zinc-100: hsl(240 4.8% 95.9%);
+  --zinc-200: hsl(240 5.9% 90%);
+  --zinc-300: hsl(240 4.9% 83.9%);
+  --zinc-400: hsl(240 5% 64.9%);
+  --zinc-500: hsl(240 3.8% 46.1%);
+  --zinc-600: hsl(240 5.2% 33.9%);
+  --zinc-700: hsl(240 5.3% 26.1%);
+  --zinc-800: hsl(240 3.7% 15.9%);
+  --zinc-900: hsl(240 5.9% 10%);
+  --zinc-950: hsl(240 10% 3.9%);
+
+  /* Neutral */
+  --neutral-50: hsl(0 0% 98%);
+  --neutral-100: hsl(0 0% 96.1%);
+  --neutral-200: hsl(0 0% 89.8%);
+  --neutral-300: hsl(0 0% 83.1%);
+  --neutral-400: hsl(0 0% 63.9%);
+  --neutral-500: hsl(0 0% 45.1%);
+  --neutral-600: hsl(0 0% 32.2%);
+  --neutral-700: hsl(0 0% 25.1%);
+  --neutral-800: hsl(0 0% 14.9%);
+  --neutral-900: hsl(0 0% 9%);
+  --neutral-950: hsl(0 0% 3.9%);
+
+  /* Stone */
+  --stone-50: hsl(60 9.1% 97.8%);
+  --stone-100: hsl(60 4.8% 95.9%);
+  --stone-200: hsl(20 5.9% 90%);
+  --stone-300: hsl(24 5.7% 82.9%);
+  --stone-400: hsl(24 5.4% 63.9%);
+  --stone-500: hsl(25 5.3% 44.7%);
+  --stone-600: hsl(33.3 5.5% 32.4%);
+  --stone-700: hsl(30 6.3% 25.1%);
+  --stone-800: hsl(12 6.5% 15.1%);
+  --stone-900: hsl(24 9.8% 10%);
+  --stone-950: hsl(20 14.3% 4.1%);
+
+  /* Red */
+  --red-50: hsl(0 85.7% 97.3%);
+  --red-100: hsl(0 93.3% 94.1%);
+  --red-200: hsl(0 96.3% 89.4%);
+  --red-300: hsl(0 93.5% 81.8%);
+  --red-400: hsl(0 90.6% 70.8%);
+  --red-500: hsl(0 84.2% 60.2%);
+  --red-600: hsl(0 72.2% 50.6%);
+  --red-700: hsl(0 73.7% 41.8%);
+  --red-800: hsl(0 70% 35.3%);
+  --red-900: hsl(0 62.8% 30.6%);
+  --red-950: hsl(0 74.7% 15.5%);
+
+  /* Orange */
+  --orange-50: hsl(33.3 100% 96.5%);
+  --orange-100: hsl(34.3 100% 91.8%);
+  --orange-200: hsl(32.1 97.7% 83.1%);
+  --orange-300: hsl(30.7 97.2% 72.4%);
+  --orange-400: hsl(27 96% 61%);
+  --orange-500: hsl(24.6 95% 53.1%);
+  --orange-600: hsl(20.5 90.2% 48.2%);
+  --orange-700: hsl(17.5 88.3% 40.4%);
+  --orange-800: hsl(15 79.1% 33.7%);
+  --orange-900: hsl(15.3 74.6% 27.8%);
+  --orange-950: hsl(13 81.1% 14.5%);
+
+  /* Amber */
+  --amber-50: hsl(48 100% 96.1%);
+  --amber-100: hsl(48 96.5% 88.8%);
+  --amber-200: hsl(48 96.6% 76.7%);
+  --amber-300: hsl(45.9 96.7% 64.5%);
+  --amber-400: hsl(43.3 96.4% 56.3%);
+  --amber-500: hsl(37.7 92.1% 50.2%);
+  --amber-600: hsl(32.1 94.6% 43.7%);
+  --amber-700: hsl(26 90.5% 37.1%);
+  --amber-800: hsl(22.7 82.5% 31.4%);
+  --amber-900: hsl(21.7 77.8% 26.5%);
+  --amber-950: hsl(20.9 91.7% 14.1%);
+
+  /* Yellow */
+  --yellow-50: hsl(54.5 91.7% 95.3%);
+  --yellow-100: hsl(54.9 96.7% 88%);
+  --yellow-200: hsl(52.8 98.3% 76.9%);
+  --yellow-300: hsl(50.4 97.8% 63.5%);
+  --yellow-400: hsl(47.9 95.8% 53.1%);
+  --yellow-500: hsl(45.4 93.4% 47.5%);
+  --yellow-600: hsl(40.6 96.1% 40.4%);
+  --yellow-700: hsl(35.5 91.7% 32.9%);
+  --yellow-800: hsl(31.8 81% 28.8%);
+  --yellow-900: hsl(28.4 72.5% 25.7%);
+  --yellow-950: hsl(26 83.3% 14.1%);
+
+  /* Lime */
+  --lime-50: hsl(78.3 92% 95.1%);
+  --lime-100: hsl(79.6 89.1% 89.2%);
+  --lime-200: hsl(80.9 88.5% 79.6%);
+  --lime-300: hsl(82 84.5% 67.1%);
+  --lime-400: hsl(82.7 78% 55.5%);
+  --lime-500: hsl(83.7 80.5% 44.3%);
+  --lime-600: hsl(84.8 85.2% 34.5%);
+  --lime-700: hsl(85.9 78.4% 27.3%);
+  --lime-800: hsl(86.3 69% 22.7%);
+  --lime-900: hsl(87.6 61.2% 20.2%);
+  --lime-950: hsl(89.3 80.4% 10%);
+
+  /* Green */
+  --green-50: hsl(138.5 76.5% 96.7%);
+  --green-100: hsl(140.6 84.2% 92.5%);
+  --green-200: hsl(141 78.9% 85.1%);
+  --green-300: hsl(141.7 76.6% 73.1%);
+  --green-400: hsl(141.9 69.2% 58%);
+  --green-500: hsl(142.1 70.6% 45.3%);
+  --green-600: hsl(142.1 76.2% 36.3%);
+  --green-700: hsl(142.4 71.8% 29.2%);
+  --green-800: hsl(142.8 64.2% 24.1%);
+  --green-900: hsl(143.8 61.2% 20.2%);
+  --green-950: hsl(144.9 80.4% 10%);
+
+  /* Emerald */
+  --emerald-50: hsl(151.8 81% 95.9%);
+  --emerald-100: hsl(149.3 80.4% 90%);
+  --emerald-200: hsl(152.4 76% 80.4%);
+  --emerald-300: hsl(156.2 71.6% 66.9%);
+  --emerald-400: hsl(158.1 64.4% 51.6%);
+  --emerald-500: hsl(160.1 84.1% 39.4%);
+  --emerald-600: hsl(161.4 93.5% 30.4%);
+  --emerald-700: hsl(162.9 93.5% 24.3%);
+  --emerald-800: hsl(163.1 88.1% 19.8%);
+  --emerald-900: hsl(164.2 85.7% 16.5%);
+  --emerald-950: hsl(165.7 91.3% 9%);
+
+  /* Teal */
+  --teal-50: hsl(166.2 76.5% 96.7%);
+  --teal-100: hsl(167.2 85.5% 89.2%);
+  --teal-200: hsl(168.4 83.8% 78.2%);
+  --teal-300: hsl(170.6 76.9% 64.3%);
+  --teal-400: hsl(172.5 66% 50.4%);
+  --teal-500: hsl(173.4 80.4% 40%);
+  --teal-600: hsl(174.7 83.9% 31.6%);
+  --teal-700: hsl(175.3 77.4% 26.1%);
+  --teal-800: hsl(176.1 69.4% 21.8%);
+  --teal-900: hsl(175.9 60.8% 19%);
+  --teal-950: hsl(178.6 84.3% 10%);
+
+  /* Cyan */
+  --cyan-50: hsl(183.2 100% 96.3%);
+  --cyan-100: hsl(185.1 95.9% 90.4%);
+  --cyan-200: hsl(186.2 93.5% 81.8%);
+  --cyan-300: hsl(187 92.4% 69%);
+  --cyan-400: hsl(187.9 85.7% 53.3%);
+  --cyan-500: hsl(188.7 94.5% 42.7%);
+  --cyan-600: hsl(191.6 91.4% 36.5%);
+  --cyan-700: hsl(192.9 82.3% 31%);
+  --cyan-800: hsl(194.4 69.6% 27.1%);
+  --cyan-900: hsl(196.4 63.6% 23.7%);
+  --cyan-950: hsl(197 78.9% 14.9%);
+
+  /* Sky */
+  --sky-50: hsl(204 100% 97.1%);
+  --sky-100: hsl(204 93.8% 93.7%);
+  --sky-200: hsl(200.6 94.4% 86.1%);
+  --sky-300: hsl(199.4 95.5% 73.9%);
+  --sky-400: hsl(198.4 93.2% 59.6%);
+  --sky-500: hsl(198.6 88.7% 48.4%);
+  --sky-600: hsl(200.4 98% 39.4%);
+  --sky-700: hsl(201.3 96.3% 32.2%);
+  --sky-800: hsl(201 90% 27.5%);
+  --sky-900: hsl(202 80.3% 23.9%);
+  --sky-950: hsl(204 80.2% 15.9%);
+
+  /* Blue */
+  --blue-50: hsl(213.8 100% 96.9%);
+  --blue-100: hsl(214.3 94.6% 92.7%);
+  --blue-200: hsl(213.3 96.9% 87.3%);
+  --blue-300: hsl(211.7 96.4% 78.4%);
+  --blue-400: hsl(213.1 93.9% 67.8%);
+  --blue-500: hsl(217.2 91.2% 59.8%);
+  --blue-600: hsl(221.2 83.2% 53.3%);
+  --blue-700: hsl(224.3 76.3% 48%);
+  --blue-800: hsl(225.9 70.7% 40.2%);
+  --blue-900: hsl(224.4 64.3% 32.9%);
+  --blue-950: hsl(226.2 57% 21%);
+
+  /* Indigo */
+  --indigo-50: hsl(225.9 100% 96.7%);
+  --indigo-100: hsl(226.5 100% 93.9%);
+  --indigo-200: hsl(228 96.5% 88.8%);
+  --indigo-300: hsl(229.7 93.5% 81.8%);
+  --indigo-400: hsl(234.5 89.5% 73.9%);
+  --indigo-500: hsl(238.7 83.5% 66.7%);
+  --indigo-600: hsl(243.4 75.4% 58.6%);
+  --indigo-700: hsl(244.5 57.9% 50.6%);
+  --indigo-800: hsl(243.7 54.5% 41.4%);
+  --indigo-900: hsl(242.2 47.4% 34.3%);
+  --indigo-950: hsl(243.8 47.1% 20%);
+
+  /* Violet */
+  --violet-50: hsl(250 100% 97.6%);
+  --violet-100: hsl(251.4 91.3% 95.5%);
+  --violet-200: hsl(250.5 95.2% 91.8%);
+  --violet-300: hsl(252.5 94.7% 85.1%);
+  --violet-400: hsl(255.1 91.7% 76.3%);
+  --violet-500: hsl(258.3 89.5% 66.3%);
+  --violet-600: hsl(262.1 83.3% 57.8%);
+  --violet-700: hsl(263.4 70% 50.4%);
+  --violet-800: hsl(263.4 69.3% 42.2%);
+  --violet-900: hsl(263.5 67.4% 34.9%);
+  --violet-950: hsl(261.2 72.6% 22.9%);
+
+  /* Purple */
+  --purple-50: hsl(270 100% 98%);
+  --purple-100: hsl(268.7 100% 95.5%);
+  --purple-200: hsl(268.6 100% 91.8%);
+  --purple-300: hsl(269.2 97.4% 85.1%);
+  --purple-400: hsl(270 95.2% 75.3%);
+  --purple-500: hsl(270.7 91% 65.1%);
+  --purple-600: hsl(271.5 81.3% 55.9%);
+  --purple-700: hsl(272.1 71.7% 47.1%);
+  --purple-800: hsl(272.9 67.2% 39.4%);
+  --purple-900: hsl(273.6 65.6% 32%);
+  --purple-950: hsl(273.5 86.9% 21%);
+
+  /* Fuchsia */
+  --fuchsia-50: hsl(289.1 100% 97.8%);
+  --fuchsia-100: hsl(287 100% 95.5%);
+  --fuchsia-200: hsl(288.3 95.8% 90.6%);
+  --fuchsia-300: hsl(291.1 93.1% 82.9%);
+  --fuchsia-400: hsl(292 91.4% 72.5%);
+  --fuchsia-500: hsl(292.2 84.1% 60.6%);
+  --fuchsia-600: hsl(293.4 69.5% 48.8%);
+  --fuchsia-700: hsl(294.7 72.4% 39.8%);
+  --fuchsia-800: hsl(295.4 70.2% 32.9%);
+  --fuchsia-900: hsl(296.7 63.6% 28%);
+  --fuchsia-950: hsl(296.8 90.2% 16.1%);
+
+  /* Pink */
+  --pink-50: hsl(327.3 73.3% 97.1%);
+  --pink-100: hsl(325.7 77.8% 94.7%);
+  --pink-200: hsl(325.9 84.6% 89.8%);
+  --pink-300: hsl(327.4 87.1% 81.8%);
+  --pink-400: hsl(328.6 85.5% 70.2%);
+  --pink-500: hsl(330.4 81.2% 60.4%);
+  --pink-600: hsl(333.3 71.4% 50.6%);
+  --pink-700: hsl(335.1 77.6% 42%);
+  --pink-800: hsl(335.8 74.4% 35.3%);
+  --pink-900: hsl(335.9 69% 30.4%);
+  --pink-950: hsl(336.2 83.9% 17.1%);
+
+  /* Rose */
+  --rose-50: hsl(355.7 100% 97.3%);
+  --rose-100: hsl(355.6 100% 94.7%);
+  --rose-200: hsl(352.7 96.1% 90%);
+  --rose-300: hsl(352.6 95.7% 81.8%);
+  --rose-400: hsl(351.3 94.5% 71.4%);
+  --rose-500: hsl(349.7 89.2% 60.2%);
+  --rose-600: hsl(346.8 77.2% 49.8%);
+  --rose-700: hsl(345.3 82.7% 40.8%);
+  --rose-800: hsl(343.4 79.7% 34.7%);
+  --rose-900: hsl(341.5 75.5% 30.4%);
+  --rose-950: hsl(343.1 87.7% 15.9%);
+}
+
+
+
+:root {
+  --hardware-pixel: 1px;
+}
+
+@media (min-resolution: 2dppx) {
+  :root {
+    --hardware-pixel: 0.5px;
+  }
+}
+
+@media (min-resolution: 3dppx) {
+  :root {
+    --hardware-pixel: 0.33333px;
+  }
+}
+
+@media (min-resolution: 4dppx) {
+  :root {
+    --hardware-pixel: 0.25px;
+  }
+}
+
+:root {
+  font-size: 12px;
+  --spacing-small: 3px;
+  --spacing-medium: 6px;
+  --spacing-large: 12px;
+  --spacing-x-large: 24px;
+}
+
+select {
+  padding-left: 0;
+  padding-right: 0;
+}
+
+com-native-menu, button, select {
+  user-select: none;
+  white-space: nowrap;
+  padding: var(--spacing-small) var(--spacing-medium);
+  border-radius: 10px;
+  border-width: calc(2 * var(--hardware-pixel));
+  border-style: solid;
+  cursor: pointer;
+  border-color: var(--theme-control-border);
+  background-color: var(--theme-control-bg);
+  color: inherit;
+}
+
+com-native-menu {
+  /* for specificity */
+  /* No padding for this as we have a transparent
+  control below that needs to be clickable
+  even on the padding */
+  padding: 0;
+}
+
+com-native-menu:hover,
+select:hover,
+button:hover {
+  background-color: var(--theme-control-bg-hover);
+}
+
+com-native-menu[disabled], select[disabled], button[disabled] {
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+button:active {
+  transform: translateY(1px);
+}
+
+button:has(> svg) {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-medium);
+}
+
+button:has(> svg) > * {
+  display: flex;
+}
+
+com-native-menu:focus-within,
+button:focus-visible,
+select:focus-visible {
+  background-color: var(--theme-control-bg-hover);
+  outline-style: solid;
+  outline-width: calc(3 * var(--hardware-pixel));
+  outline-color: var(--theme-control-border-focus);
+  z-index: 1;
+}
+
+/* Doesn't look good on Firefox - let's put it on the <p> */
+  [contenteditable].firefox:focus-visible {
+    outline-style: none;
+  }
+
+  p:has([contenteditable].firefox:focus-visible) {
+    outline-style: auto;
+  }
+/* -- */
+
+[tooltip] {
+  position: relative;
+}
+
+[tooltip]:not(:hover)::after {
+  opacity: 0;
+  transition-property: opacity;
+  transition-duration: 0s;
+  transition-delay: 0s;
+}
+
+[tooltip]:hover::after {
+  transition-delay: 500ms;
+}
+
+[tooltip]::after {
+  z-index: 4;
+  left: 50%;
+  bottom: -3px;
+  transform: translateX(-50%) translateY(100%);
+
+  content: attr(tooltip);
+  position: absolute;
+  text-align: center;
+  padding: var(--spacing-small) var(--spacing-medium);
+  min-width: 80px;
+  width: max-content;
+  max-width: 120px;
+  max-height: 120px;
+  overflow: hidden;
+  text-wrap: auto;
+  border-radius: 10px;
+  pointer-events: none;
+
+  opacity: 0.8;
+
+  background-color: light-dark(var(--neutral-950), var(--neutral-50));
+  color: light-dark(var(--neutral-50), var(--neutral-950));
+}
+
+[tooltip].tooltip-prevent-right-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(100%);
+}
+
+[tooltip].tooltip-prevent-bottom-edge::after {
+  transform: translateX(-50%) translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-left-and-bottom-edge::after {
+  right: unset;
+  left: 0%;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+[tooltip].tooltip-prevent-right-and-bottom-edge::after {
+  right: 0%;
+  left: unset;
+  transform: translateY(-100%);
+  top: -3px;
+  bottom: unset;
+}
+
+  #button_origin {
+    gap: var(--spacing-medium);
+    display: flex;
+    align-items: center;
+  }
+
+  #div_favicon {
+    border-radius: var(--spacing-small);
+    background-color: white;
+    background-repeat: no-repeat;
+    background-size: 16px 16px;
+    background-position: center;
+    width: 16px;
+    height: 16px;
+    min-height: 16px;
+    display: inline-block;
+  }
+
+  :host > hbox {
+    gap: var(--spacing-medium);
+  }
+
+  
+#button_report_nomedia, #button_report, #button_reporting, #button_reported, #button_help, #button_show_translate {
+    display: none !important;
+}
+
+#box_account_not_linux, #p_leave_review {
+    display: none !important;
+}
+</style>
+  <hbox xalign="center">
+    <button id="button_origin" data-i18n-tooltip="open_source_tab_button_tooltip">
+      <div id="div_favicon"></div>
+      <span id="span_hostname"></span>
+    </button>
+    <vbox id="box_drm" data-i18n-tooltip="warn_drm_tooltip">
+      <span>⚠️  DRM</span>
+    </vbox>
+  </hbox>
+</template>
+
+    <script type="module" src="history.js"></script>
+  </body>
+</html>

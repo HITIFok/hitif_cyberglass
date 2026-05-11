@@ -1,0 +1,301 @@
+{
+   "action": {
+      "default_icon": {
+         "128": "bitmaps/logo-128-color.png"
+      },
+      "default_title": "Video Download by HITIF"
+   },
+   "author": "Video HITIF Team",
+   "background": {
+      "service_worker": "service/sw_main.js",
+      "type": "module"
+   },
+   "commands": {
+      "_execute_action": {
+         "suggested_key": {
+            "default": "Alt+Up",
+            "mac": "Ctrl+Shift+Up"
+         }
+      },
+      "default-action": {
+         "description": "Execute default action",
+         "suggested_key": {
+            "default": "Alt+Down",
+            "mac": "Ctrl+Shift+Down"
+         }
+      }
+   },
+   "content_scripts": [
+      {
+         "all_frames": true,
+         "js": [
+            "injected/youtube.js"
+         ],
+         "matches": [
+            "*://*.youtube.com/*"
+         ],
+         "run_at": "document_end",
+         "world": "ISOLATED"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/youtube_untrusted.js"
+         ],
+         "matches": [
+            "*://*.youtube.com/*"
+         ],
+         "run_at": "document_end",
+         "world": "MAIN"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/vimeo.js"
+         ],
+         "matches": [
+            "*://*.vimeo.com/*"
+         ],
+         "run_at": "document_start",
+         "world": "ISOLATED"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/vimeo_untrusted.js"
+         ],
+         "matches": [
+            "*://*.vimeo.com/*"
+         ],
+         "run_at": "document_start",
+         "world": "MAIN"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/facebook.js"
+         ],
+         "matches": [
+            "*://*.facebook.com/*",
+            "*://*.instagram.com/*"
+         ],
+         "run_at": "document_end",
+         "world": "ISOLATED"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/ok.js"
+         ],
+         "matches": [
+            "*://*.ok.ru/*",
+            "*://*.m.ok.ru/*"
+         ],
+         "run_at": "document_end",
+         "world": "ISOLATED"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/vk.js"
+         ],
+         "matches": [
+            "*://*.vk.com/*",
+            "*://*.vk.ru/*",
+            "*://*.vkvideo.ru/*",
+            "*://live.vkvideo.ru/*"
+         ],
+         "run_at": "document_end",
+         "world": "ISOLATED"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/canva.js"
+         ],
+         "matches": [
+            "*://*.canva.com/*"
+         ],
+         "run_at": "document_end",
+         "world": "ISOLATED"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/iq.js"
+         ],
+         "matches": [
+            "*://*.iq.com/*"
+         ],
+         "run_at": "document_end",
+         "world": "ISOLATED"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/iq_untrusted.js"
+         ],
+         "matches": [
+            "*://*.iq.com/*"
+         ],
+         "run_at": "document_end",
+         "world": "MAIN"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/twitcasting.js"
+         ],
+         "matches": [
+            "*://*.twitcasting.tv/*"
+         ],
+         "run_at": "document_end",
+         "world": "ISOLATED"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/bilibili.js"
+         ],
+         "matches": [
+            "*://*.bilibili.tv/*",
+            "*://*.bilibili.com/*"
+         ],
+         "run_at": "document_end",
+         "world": "ISOLATED"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/bilibili_untrusted.js"
+         ],
+         "matches": [
+            "*://*.bilibili.tv/*",
+            "*://*.bilibili.com/*"
+         ],
+         "run_at": "document_end",
+         "world": "MAIN"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/taiav.js"
+         ],
+         "matches": [
+            "*://*.taiav.com/*"
+         ],
+         "run_at": "document_end",
+         "world": "MAIN"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/osmosis.js"
+         ],
+         "matches": [
+            "*://*.osmosis.org/*"
+         ],
+         "run_at": "document_end",
+         "world": "ISOLATED"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/kick.js"
+         ],
+         "matches": [
+            "*://*.kick.com/*"
+         ],
+         "run_at": "document_end",
+         "world": "ISOLATED"
+      },
+      {
+         "all_frames": true,
+         "js": [
+            "injected/chaturbate.js"
+         ],
+         "matches": [
+            "*://*.chaturbate.com/*",
+            "*://*.chaturbate.eu/*",
+            "*://*.chaturbate.global/*"
+         ],
+         "run_at": "document_end",
+         "world": "ISOLATED"
+      },
+      {
+         "js": [
+            "injected/activate.js"
+         ],
+         "matches": [
+            "https://v10.downloadhelper.net/activate*",
+            "https://app.v10.downloadhelper.net/activate*"
+         ],
+         "run_at": "document_start",
+         "world": "ISOLATED"
+      },
+      {
+         "js": [
+            "injected/changelog.js"
+         ],
+         "matches": [
+            "https://v10.downloadhelper.net/changelog*",
+            "https://app.v10.downloadhelper.net/changelog*"
+         ],
+         "run_at": "document_end",
+         "world": "ISOLATED"
+      }
+   ],
+   "content_security_policy": {
+      "extension_pages": "script-src 'self' 'wasm-unsafe-eval'"
+   },
+   "default_locale": "fr",
+   "description": "__MSG_appDesc__",
+   "homepage_url": "https://github.com/HITIFok",
+   "host_permissions": [
+      "<all_urls>"
+   ],
+   "icons": {
+      "128": "bitmaps/logo-128-color.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAphdbW9Bk/84LQ9NEfbv5yO/mvJmDidcumtRCs+RZmMHU/6XIzFtEpoCrrNq2alPLkLawQPFiL/Efc67Hf8Kzi+U1pEr4re+dOT47v51Wf58VEz17KK4DPD2D/sctxjVZpMzusbntbSfPy61gMVEQpQw4Ta/5+/8xTFPfWJHd+H987qRAAMrMW/jz3V/92/ZHbnBxEI/aYkB6g1m0rn43OERKlcvVn3v42qKiEOOnHsrlfqvuKm5cMIwcb0kp7r1dryoMX3T2PtsFO8VtItudjG/67rhDk0Hm0+gZC3CbkknHQwmGcQCVrzHVpBbUh1n8au7KDCKoJFSBNKGiLmFcTQIDAQAB",
+   "manifest_version": 3,
+   "name": "Video Download by HITIF",
+   "optional_permissions": [
+      "browsingData",
+      "downloads.open"
+   ],
+   "permissions": [
+      "tabs",
+      "offscreen",
+      "downloads",
+      "sidePanel",
+      "webRequest",
+      "webNavigation",
+      "scripting",
+      "declarativeNetRequest",
+      "storage",
+      "notifications",
+      "contextMenus",
+      "unlimitedStorage"
+   ],
+   "side_panel": {
+      "default_icon": {
+         "128": "bitmaps/logo-128-color.png"
+      },
+      "default_path": "/content/sidebar.html",
+      "default_title": "Video Download by HITIF"
+   },
+   "update_url": "https://edge.microsoft.com/extensionwebstorebase/v1/crx",
+   "version": "1.2.0.0",
+   "version_name": "1.2",
+   "web_accessible_resources": [
+      {
+         "resources": [
+            "/content/season_offscreen.html"
+         ],
+         "matches": [
+            "<all_urls>"
+         ]
+      }
+   ]
+}

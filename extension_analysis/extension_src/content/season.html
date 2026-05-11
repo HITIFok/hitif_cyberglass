@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Telecharger une Saison - Video Download by HITIF</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --bg: hsl(225 25% 5%);
+  --surface: hsl(225 22% 8%);
+  --border: hsl(225 30% 18%);
+  --border-hi: hsl(250 75% 50% / 0.3);
+  --accent: hsl(250 85% 65%);
+  --accent2: hsl(180 85% 55%);
+  --glow: hsl(250 85% 60% / 0.3);
+  --text: hsl(220 15% 88%);
+  --text-dim: hsl(220 10% 55%);
+  --text-bright: hsl(220 15% 96%);
+  --danger: hsl(0 75% 60%);
+  --success: hsl(142 71% 45%);
+  --warning: hsl(38 92% 50%);
+}
+
+html, body {
+  height: 100%;
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(250 50% 30%) hsl(225 20% 8%);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 20% -5%, hsl(250 80% 20% / 0.12) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 85% 110%, hsl(180 70% 20% / 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 30% at 50% 50%, hsl(225 40% 12% / 0.3) 0%, transparent 70%);
+}
+
+.header {
+  padding: 20px 28px 16px;
+  border-bottom: 1px solid hsl(225 25% 15%);
+  background: hsl(225 22% 7% / 0.6);
+  backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+.header-icon {
+  width: 40px; height: 40px;
+  background: linear-gradient(135deg, hsl(250 85% 58%), hsl(280 75% 55%));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 12px hsl(250 80% 50% / 0.25);
+  flex-shrink: 0;
+}
+
+.header-icon svg { width: 22px; height: 22px; fill: white; }
+
+.header-text h1 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  letter-spacing: -0.01em;
+}
+
+.header-text p {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.card {
+  background: linear-gradient(145deg, hsl(225 24% 9% / 0.95), hsl(230 22% 7% / 0.95));
+  border: 1px solid var(--border-hi);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 16px hsl(0 0% 0% / 0.35), 0 0 0 1px hsl(250 60% 60% / 0.04) inset;
+  backdrop-filter: blur(16px) saturate(1.2);
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+
+.card:hover {
+  border-color: hsl(250 70% 50% / 0.4);
+  box-shadow: 0 4px 24px hsl(0 0% 0% / 0.4), 0 0 0 1px hsl(250 60% 60% / 0.08) inset, 0 0 30px hsl(250 80% 50% / 0.05);
+}
+
+.card h2 {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: hsl(220 15% 92%);
+  margin-bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card h2 svg { width: 18px; height: 18px; opacity: 0.7; fill: currentColor; }
+
+.form-group { margin-bottom: 14px; }
+.form-group:last-child { margin-bottom: 0; }
+
+label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  letter-spacing: 0.02em;
+}
+
+input[type="text"], input[type="number"] {
+  width: 100%;
+  background: hsl(225 20% 10%);
+  border: 1.5px solid hsl(225 25% 20%);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 10px 14px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.88rem;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+input[type="text"]:focus, input[type="number"]:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px hsl(250 80% 58% / 0.15), 0 0 12px hsl(250 80% 58% / 0.08);
+}
+
+input[type="text"]::placeholder { color: hsl(220 8% 35%); }
+
+.input-hint {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+  opacity: 0.8;
+}
+
+.url-preview {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: hsl(225 18% 6%);
+  border-radius: 6px;
+  border: 1px solid hsl(225 25% 15%);
+  font-size: 0.75rem;
+  color: var(--accent);
+  word-break: break-all;
+  display: none;
+}
+
+.url-preview.visible { display: block; }
+
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: 1.5px solid hsl(225 25% 18%);
+  background: hsl(225 22% 11%);
+  color: var(--text);
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.btn:hover {
+  background: hsl(250 40% 18%);
+  border-color: hsl(250 65% 45% / 0.45);
+  color: var(--text-bright);
+  box-shadow: 0 2px 8px hsl(0 0% 0% / 0.3), 0 0 16px hsl(250 80% 50% / 0.08);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0px) scale(0.98);
+  transition-duration: 50ms;
+}
+
+.btn:disabled { opacity: 0.35; pointer-events: none; }
+
+.btn-primary {
+  background: linear-gradient(135deg, hsl(250 80% 50%), hsl(270 70% 55%));
+  border-color: hsl(250 75% 50%);
+  color: white;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, hsl(250 85% 55%), hsl(270 75% 58%));
+  box-shadow: 0 2px 16px hsl(250 80% 50% / 0.35), 0 0 24px hsl(250 80% 50% / 0.12);
+}
+
+.btn-danger {
+  border-color: hsl(0 50% 30%);
+  color: var(--danger);
+}
+
+.btn-danger:hover {
+  background: hsl(0 40% 18%);
+  border-color: hsl(0 65% 45%);
+}
+
+.btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+.progress-section { display: none; }
+.progress-section.active { display: block; }
+
+.progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.progress-header h2 { margin-bottom: 0; }
+
+.progress-stats {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.progress-stats .stat-value {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 6px;
+  background: hsl(225 20% 12%);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, hsl(250 80% 58%), hsl(270 70% 55%));
+  border-radius: 3px;
+  transition: width 300ms ease;
+  box-shadow: 0 0 8px hsl(250 80% 58% / 0.3);
+}
+
+.episode-list {
+  max-height: 350px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(250 50% 30%) transparent;
+}
+
+.episode-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: hsl(225 18% 6%);
+  border: 1px solid transparent;
+  font-size: 0.82rem;
+  transition: all 200ms ease;
+}
+
+.episode-item.pending { border-color: hsl(225 25% 15%); }
+.episode-item.loading { border-color: hsl(250 50% 30%); background: hsl(250 30% 8%); }
+.episode-item.success { border-color: hsl(142 50% 25%); background: hsl(142 20% 8%); }
+.episode-item.error { border-color: hsl(0 50% 25%); background: hsl(0 20% 8%); }
+.episode-item.skipped { border-color: hsl(38 50% 25%); background: hsl(38 20% 8%); opacity: 0.6; }
+.episode-item.download { border-color: hsl(142 50% 25%); background: hsl(142 20% 8%); }
+
+.episode-number {
+  font-weight: 600;
+  color: var(--text-bright);
+  min-width: 70px;
+  font-size: 0.78rem;
+}
+
+.episode-status {
+  flex: 1;
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.episode-icon {
+  width: 16px; height: 16px;
+  flex-shrink: 0;
+  fill: var(--text-dim);
+}
+
+.episode-item.success .episode-icon { fill: var(--success); }
+.episode-item.download .episode-icon { fill: var(--success); }
+.episode-item.error .episode-icon { fill: var(--danger); }
+.episode-item.skipped .episode-icon { fill: var(--warning); }
+.episode-item.loading .episode-icon {
+  fill: var(--accent);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--text);
+  padding: 6px 0;
+}
+
+.checkbox-label input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border: 1.5px solid hsl(225 25% 25%);
+  border-radius: 4px;
+  background: hsl(225 22% 10%);
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  transition: all 150ms ease;
+}
+
+.checkbox-label input[type="checkbox"]:checked {
+  background: hsl(250 80% 58%);
+  border-color: hsl(250 80% 58%);
+  box-shadow: 0 0 8px hsl(250 80% 58% / 0.3);
+}
+
+.checkbox-label input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 5px; top: 2px;
+  width: 5px; height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+.settings-row label { margin-bottom: 0; }
+
+select {
+  background: hsl(225 20% 10%);
+  border: 1.5px solid hsl(225 25% 20%);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 10px;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 0.82rem;
+  outline: none;
+  cursor: pointer;
+}
+
+select:focus { border-color: var(--accent); }
+
+/* Notification toast */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #fff;
+  z-index: 99999;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  transition: opacity 300ms ease;
+  pointer-events: none;
+}
+
+.toast.success { background: hsl(142 71% 45%); }
+.toast.error { background: hsl(0 75% 55%); }
+.toast.info { background: hsl(250 85% 58%); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-icon">
+    <svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM9.5 7.5l7 4.5-7 4.5z"/></svg>
+  </div>
+  <div class="header-text">
+    <h1>Telecharger une Saison</h1>
+    <p>Telechargez tous les episodes d'une saison en un seul clic</p>
+  </div>
+</div>
+
+<div class="content">
+
+  <div class="card" id="config-card">
+    <h2>
+      <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.488.488 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+      Configuration
+    </h2>
+
+    <div class="form-group">
+      <label>URL de l'episode</label>
+      <input type="text" id="url-pattern" placeholder="Collez une URL d'episode (ex: .../1-episode.html)"/>
+      <div class="url-preview" id="url-preview"></div>
+    </div>
+
+    <div class="row">
+      <div class="form-group">
+        <label>Episode de debut</label>
+        <input type="number" id="start-episode" value="1" min="0"/>
+      </div>
+      <div class="form-group">
+        <label>Episode de fin</label>
+        <input type="number" id="end-episode" value="24" min="0"/>
+      </div>
+    </div>
+
+    <div class="settings-row">
+      <label>Delai entre les episodes (secondes)</label>
+      <select id="delay">
+        <option value="5">5s</option>
+        <option value="8" selected>8s</option>
+        <option value="10">10s</option>
+        <option value="15">15s</option>
+        <option value="20">20s</option>
+        <option value="30">30s</option>
+      </select>
+    </div>
+
+    <div class="settings-row">
+      <label>Temps max d'attente par episode</label>
+      <select id="timeout">
+        <option value="15">15s</option>
+        <option value="20" selected>20s</option>
+        <option value="30">30s</option>
+        <option value="45">45s</option>
+        <option value="60">60s</option>
+      </select>
+    </div>
+
+    <label class="checkbox-label">
+      <input type="checkbox" id="auto-close" checked/>
+      Fermer automatiquement l'onglet apres detection
+    </label>
+
+    <label class="checkbox-label">
+      <input type="checkbox" id="auto-download" checked/>
+      Telecharger automatiquement la video detectee
+    </label>
+
+    <div class="actions">
+      <button class="btn" id="btn-test">
+        <svg viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+        Tester
+      </button>
+      <button class="btn btn-primary" id="btn-start">
+        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        Lancer le telechargement
+      </button>
+    </div>
+  </div>
+
+  <div class="card progress-section" id="progress-card">
+    <div class="progress-header">
+      <h2>
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+        Progression
+      </h2>
+      <div class="progress-stats">
+        <span><span class="stat-value" id="stat-current">0</span> / <span id="stat-total">0</span></span>
+        <span>OK : <span class="stat-value" id="stat-success">0</span></span>
+        <span>Err : <span class="stat-value" id="stat-error">0</span></span>
+      </div>
+    </div>
+
+    <div class="progress-bar-container">
+      <div class="progress-bar-fill" id="progress-bar" style="width: 0%"></div>
+    </div>
+
+    <div class="episode-list" id="episode-list"></div>
+
+    <div class="actions">
+      <button class="btn btn-danger" id="btn-stop">
+        <svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+        Arreter
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script src="season.js"></script>
+</body>
+</html>
