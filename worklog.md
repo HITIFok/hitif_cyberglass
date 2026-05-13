@@ -187,3 +187,24 @@ Stage Summary:
 - No debuggable flag, ProGuard/R8 minification enabled
 - APK saved: /home/z/my-project/download/hitif-videodownloader-release.apk
 - GitHub artifact: https://github.com/HITIFok/hitif_cyberglass/actions/runs/25796316033
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Wire (+) button to open TabSwitcher bottom sheet
+
+Work Log:
+- Analyzed existing code: Tab.kt, TabAdapter.kt, TabSwitcherFragment.kt already exist and work correctly
+- Found that btnNewTab was creating tabs directly instead of opening TabSwitcher
+- Changed btnNewTab.setOnClickListener to call openTabSwitcher()
+- Changed badge visibility from count > 1 to count >= 1 (always show tab count)
+- Only 2 lines changed in BrowserActivity.kt (minimal, safe change)
+- Build passed on CI: Run 25797118694
+
+Stage Summary:
+- (+) button now opens TabSwitcher bottom sheet with all open tabs
+- Active tab is highlighted with cyan indicator and full opacity
+- Switch between tabs by tapping, close with ✕ button
+- (+ NOUVEAU) button inside TabSwitcher creates new tabs
+- Tab count badge always visible on the button
+- Commit: 565b8ec
