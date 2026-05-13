@@ -164,3 +164,26 @@ Stage Summary:
 - Build error fixed: all AAPT percentage incompatibility errors resolved
 - 10 drawable XML files corrected
 - Commit pushed: https://github.com/HITIFok/hitif_cyberglass/commit/e03bdd7
+
+---
+Task ID: 2
+Agent: Main Agent
+Task: Configure signed release APK build to reduce Play Protect notifications
+
+Work Log:
+- Generated RSA 2048-bit release keystore (valid 10000 days, alias: hitif)
+- Added signingConfigs to app/build.gradle with env var fallback for CI
+- Configured release buildType with signingConfig
+- Added keystore/ to .gitignore (keystore never committed)
+- Set 4 GitHub Secrets via API with PyNaCl encryption: KEYSTORE_BASE64, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+- Simplified build.yml to single release job with signing
+- Fixed keystore path bug: Gradle resolves file() relative to app/ module, changed from app/keystore/ to keystore/
+- First CI build failed (validateSigningRelease - double app/ path), second build SUCCESS
+- Downloaded and verified APK: v2/v3 signature, no debuggable flag, R8 enabled, 2.28 MB
+
+Stage Summary:
+- APK is now built as signed release (not debug)
+- Signature: APK Signature Scheme v2/v3 with custom keystore (CN=HITIF)
+- No debuggable flag, ProGuard/R8 minification enabled
+- APK saved: /home/z/my-project/download/hitif-videodownloader-release.apk
+- GitHub artifact: https://github.com/HITIFok/hitif_cyberglass/actions/runs/25796316033
