@@ -7,7 +7,7 @@
         </shape>
     </item>
     <!-- Bottom border line -->
-    <item android:top="98%">
+    <item android:gravity="bottom" android:height="1.5dp">
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="0"
                 android:startColor="#0000F5FF" android:centerColor="#5500F5FF"
@@ -15,7 +15,7 @@
         </shape>
     </item>
     <!-- Subtle sheen -->
-    <item android:bottom="70%">
+    <item android:gravity="top" android:height="40dp">
         <shape android:shape="rectangle">
             <gradient android:type="linear" android:angle="270"
                 android:startColor="#0EFFFFFF" android:endColor="#00FFFFFF"/>
