@@ -59,8 +59,10 @@ class DownloadProgressService : Service() {
     private var graceJob:   Job? = null
     private var databaseReady = false
 
-    /** URLs detected as potentially stale — confirmed FAILED only after 2 poll cycles */
+    /** URLs detected as potentially stale — confirmed FAILED only after 3 poll cycles (~4.5s) */
     private val pendingStale = mutableSetOf<String>()
+    /** URLs still warming up — seen as DOWNLOADING but not yet in engine (give insert time) */
+    private val warmingUp = mutableSetOf<String>()
 
     // ------------------------------------------------------------------ //
     //  Lifecycle
@@ -149,15 +151,18 @@ class DownloadProgressService : Service() {
         val db = getDatabase() ?: return
         val now = System.currentTimeMillis()
 
-        // ── Source-of-truth stale detection (with grace period) ────────────
+        // ── Source-of-truth stale detection (with extended grace period) ──────
         //
         // Rule: a record is DOWNLOADING/QUEUED in the DB but the engine no
         //       longer has it → POTENTIALLY stale.
-        //       We wait 2 poll cycles (~3 s) before marking FAILED to give
+        //       We wait 3 poll cycles (~4.5 s) before marking FAILED to give
         //       the onComplete callback time to update the DB to COMPLETED.
         //       This fixes the race condition where onComplete fires an async
         //       DB update (scope.launch) but the engine removes the URL from
         //       activeJobs immediately in its finally block.
+        //
+        //       Also: newly inserted DOWNLOADING records get a 1-cycle warm-up
+        //       to prevent false positives on slow devices.
         //
         val activeUrls = TurboDownloadEngine.getActiveUrls()
 
@@ -169,12 +174,21 @@ class DownloadProgressService : Service() {
         val newlyStaleUrls = allRecords
             .filter { record ->
                 (record.state == "DOWNLOADING" || record.state == "QUEUED") &&
-                record.url !in activeUrls
+                record.url !in activeUrls &&
+                record.url !in warmingUp
             }
             .map { it.url }
             .toSet()
 
-        // Step 2: only confirm FAILED for URLs still stale after grace period
+        // Step 2: add newly-seen DOWNLOADING URLs to warm-up set
+        val activeInDb = allRecords
+            .filter { it.state == "DOWNLOADING" || it.state == "QUEUED" }
+            .map { it.url }
+            .toSet()
+        val newInEngine = activeUrls.filter { it in activeInDb && it !in warmingUp }
+        warmingUp.addAll(newInEngine)
+
+        // Step 3: only confirm FAILED for URLs still stale after 3 cycles
         val confirmedFailed = pendingStale.intersect(newlyStaleUrls)
         confirmedFailed.forEach { url ->
             try {
@@ -184,9 +198,12 @@ class DownloadProgressService : Service() {
             } catch (_: Exception) {}
         }
 
-        // Step 3: update pending set (newly stale minus already confirmed)
+        // Step 4: update pending set (newly stale minus already confirmed, minus warm-up)
         pendingStale.clear()
         pendingStale.addAll(newlyStaleUrls - confirmedFailed)
+
+        // Step 5: clean warm-up URLs that are now in the engine
+        warmingUp.removeAll(activeUrls)
 
         // ── Summary notification ────────────────────────────────────────────
         val activeRecords     = allRecords.filter { it.state == "DOWNLOADING" || it.state == "QUEUED" }

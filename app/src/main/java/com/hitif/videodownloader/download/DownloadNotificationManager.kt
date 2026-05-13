@@ -175,12 +175,23 @@ object DownloadNotificationManager {
                 message.contains("timeout", ignoreCase = true) ||
                 message.contains("timed out", ignoreCase = true) ->
                     "Delai depasse. Le serveur ne repond pas."
+                message.contains("unexpected end of stream", ignoreCase = true) ||
+                message.contains("connection reset", ignoreCase = true) ||
+                message.contains("broken pipe", ignoreCase = true) ||
+                message.contains("Connection closed prematurely", ignoreCase = true) ->
+                    "Connexion interrompue. Reessayez (reprise automatique)."
+                message.contains("SSL", ignoreCase = true) ||
+                message.contains("ssl", ignoreCase = true) ||
+                message.contains("handshake", ignoreCase = true) ->
+                    "Erreur de securite SSL. Reessayez."
                 message.contains("403", ignoreCase = true) ||
                 message.contains("Forbidden", ignoreCase = true) ->
                     "Acces refuse. Le lien peut avoir expire."
                 message.contains("404", ignoreCase = true) ||
                 message.contains("Not Found", ignoreCase = true) ->
                     "Fichier introuvable. Le lien est peut-etre invalide."
+                message.contains("Espace critique", ignoreCase = true) ->
+                    "Espace de stockage insuffisant."
                 else -> message.take(60)
             }
             val contentText = "Echec — $userMessage"
@@ -271,9 +282,16 @@ object DownloadNotificationManager {
 
     private fun formatEta(seconds: Long): String {
         if (seconds <= 0) return ""
-        val mins = seconds / 60
+        val days = seconds / 86400
+        val hours = (seconds % 86400) / 3600
+        val mins = (seconds % 3600) / 60
         val secs = seconds % 60
-        return if (mins > 0) "${mins}m ${secs}s" else "${secs}s"
+        return buildString {
+            if (days > 0) append("${days}j ")
+            if (hours > 0) append("${hours}h ")
+            if (mins > 0) append("${mins}m ")
+            append("${secs}s")
+        }.trim()
     }
 
     /** Called from DownloadProgressService to keep notification channel alive */

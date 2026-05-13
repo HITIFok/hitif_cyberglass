@@ -56,6 +56,16 @@ object DownloadHelper {
         }
     }
 
+    fun cancel(url: String) {
+        TurboDownloadEngine.cancel(url)
+        HlsDownloader.cancel(url)
+    }
+
+    fun cancelAll() {
+        TurboDownloadEngine.cancelAll()
+        HlsDownloader.cancelAll()
+    }
+
     fun enqueueBatch(
         context: android.content.Context,
         items: List<MediaItem>

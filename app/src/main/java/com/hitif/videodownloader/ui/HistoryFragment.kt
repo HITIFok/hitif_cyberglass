@@ -83,6 +83,8 @@ class HistoryFragment : BottomSheetDialogFragment() {
     private fun setupList() {
         adapter = HistoryAdapter(
             onDelete = { record ->
+                // Cancel active download if still running
+                try { DownloadHelper.cancel(record.url) } catch (_: Exception) {}
                 try { DownloadNotificationManager.dismiss(record.url) } catch (_: Exception) {}
                 vm.deleteHistoryRecord(record)
                 Toast.makeText(requireContext(), "Supprimé de l'historique", Toast.LENGTH_SHORT).show()
@@ -110,6 +112,8 @@ class HistoryFragment : BottomSheetDialogFragment() {
     private fun setupButtons() {
         b.btnClose.setOnClickListener { dismiss() }
         b.btnClearAll.setOnClickListener {
+            // Cancel all active downloads
+            try { DownloadHelper.cancelAll() } catch (_: Exception) {}
             try { DownloadNotificationManager.dismissAll() } catch (_: Exception) {}
             vm.clearHistory()
             Toast.makeText(requireContext(), "Historique effacé", Toast.LENGTH_SHORT).show()
