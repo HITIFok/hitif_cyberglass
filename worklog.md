@@ -208,3 +208,27 @@ Stage Summary:
 - (+ NOUVEAU) button inside TabSwitcher creates new tabs
 - Tab count badge always visible on the button
 - Commit: 565b8ec
+
+---
+Task ID: 4
+Agent: Main Agent
+Task: Fix race condition causing successful downloads to show ECHEC
+
+Work Log:
+- Analyzed the complete download pipeline: DownloadHelper → TurboDownloadEngine/HlsDownloader → DownloadProgressService → Room DB
+- Identified root cause: race condition in stale detection
+  - onComplete callback updates DB asynchronously (scope.launch)
+  - TurboDownloadEngine removes URL from activeJobs immediately in finally block
+  - Service polls every 1.5s, sees DOWNLOADING + URL not in activeUrls → marks FAILED
+  - Also affects HLS: service only checks TurboDownloadEngine URLs
+- Fix: Added grace period in DownloadProgressService
+  - Added pendingStale set to track potentially stale URLs
+  - Only confirm FAILED after 2 consecutive poll cycles (~3s)
+  - Gives onComplete async DB update time to complete
+- Only 1 file changed (DownloadProgressService.kt), minimal and safe
+- Build CI passed
+
+Stage Summary:
+- Race condition fixed: successful downloads now correctly show COMPLETED
+- Grace period: 2 poll cycles (~3s) before confirming FAILED
+- Commit: a4253f1
