@@ -13,8 +13,6 @@ import com.hitif.videodownloader.network.MediaDetector
 import com.hitif.videodownloader.network.SmartNaming
 import androidx.lifecycle.MutableLiveData
 import kotlinx.coroutines.launch
-import java.net.URLDecoder
-import java.util.regex.Pattern
 
 class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
@@ -44,9 +42,6 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _seenUrls = mutableSetOf<String>()
 
-    // ── Navigation-based season tracking ─────────────────────────────────────
-    private val _navEpisodes = mutableMapOf<String, MutableSet<Int>>()
-
     val detector = MediaDetector { item ->
         val key = item.url.substringBefore('?')
         synchronized(_seenUrls) {
@@ -63,60 +58,6 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     fun onPageNavigated(url: String, title: String) {
         pageUrl.postValue(url)
         pageTitle.postValue(title)
-        trackNavigationEpisode(url)
-    }
-
-    private fun trackNavigationEpisode(url: String) {
-        try {
-            val decoded = URLDecoder.decode(url, "UTF-8")
-            val epPattern = Pattern.compile(
-                """(?:episode|épisode|ep)[\s\-–.]*(\d{1,3})""",
-                Pattern.CASE_INSENSITIVE
-            )
-            val matcher = epPattern.matcher(decoded)
-            if (matcher.find()) {
-                val epNum = matcher.group(1)?.toIntOrNull() ?: return
-                val seriesKey = decoded
-                    .replace(Regex("""/episode[\s\-–.]?\d{1,3}.*$""", RegexOption.IGNORE_CASE), "")
-                    .replace(Regex("""/ep[\s\-–.]?\d{1,3}.*$""", RegexOption.IGNORE_CASE), "")
-                    .substringBefore('?').substringBefore('#').trimEnd('/')
-
-                if (seriesKey.length >= 5) {
-                    val episodes = _navEpisodes.getOrPut(seriesKey) { mutableSetOf() }
-                    episodes.add(epNum)
-                    if (episodes.size >= 2) {
-                        buildNavigationSeasonCandidates(seriesKey, url)
-                    }
-                }
-            }
-        } catch (_: Exception) {}
-    }
-
-    private fun buildNavigationSeasonCandidates(seriesKey: String, currentUrl: String) {
-        val episodes = _navEpisodes[seriesKey] ?: return
-        val sorted = episodes.sorted()
-        val seriesName = seriesKey.substringAfterLast('/').replace(Regex("[_\\-]+"), " ").trim()
-
-        val candidates = sorted.map { ep ->
-            val epUrl = "$seriesKey/episode-$ep.html"
-            val item = MediaItem(
-                url = epUrl,
-                filename = "${seriesName.replace(" ", "_")}_E${ep.toString().padStart(2, '0')}.mp4",
-                pageUrl = epUrl,
-                mediaType = MediaType.HLS
-            )
-            SmartNaming.EpisodeCandidate(
-                item = item,
-                seriesName = seriesName,
-                season = 0,
-                episode = ep,
-                label = "E${ep.toString().padStart(2, '0')}"
-            )
-        }
-
-        val existing = seasonGroups.value.orEmpty().toMutableMap()
-        existing[seriesKey.lowercase().trim()] = candidates
-        seasonGroups.postValue(existing)
     }
 
     private fun recomputeSeasonGroups(currentItems: List<MediaItem>) {
