@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/bg_bottom_sheet">
+
+    <View android:layout_width="44dp" android:layout_height="4dp"
+        android:layout_gravity="center_horizontal" android:layout_marginTop="12dp"
+        android:layout_marginBottom="8dp" android:background="@drawable/bg_drag_handle"/>
+
+    <LinearLayout android:layout_width="match_parent" android:layout_height="56dp"
+        android:orientation="horizontal" android:paddingStart="18dp" android:paddingEnd="10dp"
+        android:gravity="center_vertical" android:background="@drawable/bg_panel_header">
+
+        <ImageView android:layout_width="22dp" android:layout_height="22dp"
+            android:src="@drawable/ic_tab"
+            android:tint="@color/accent_cyan"
+            android:layout_marginEnd="12dp"/>
+
+        <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+            android:layout_weight="1" android:orientation="vertical">
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="ONGLETS" android:textColor="@color/accent_cyan"
+                android:textSize="11sp" android:letterSpacing="0.15"
+                android:fontFamily="sans-serif-medium"/>
+            <TextView android:id="@+id/tvTabCount" android:layout_width="wrap_content"
+                android:layout_height="wrap_content" android:text="1 onglet"
+                android:textColor="@color/text_dim" android:textSize="11sp"/>
+        </LinearLayout>
+
+        <android.widget.Button android:id="@+id/btnNewTab"
+            android:layout_width="wrap_content" android:layout_height="34dp"
+            android:text="+ NOUVEAU" android:textColor="@color/accent_cyan"
+            android:textSize="9sp" android:background="@drawable/bg_icon_btn_cyan"
+            android:paddingStart="12dp" android:paddingEnd="12dp" android:layout_marginEnd="6dp"/>
+
+        <ImageButton android:id="@+id/btnClose"
+            android:layout_width="38dp" android:layout_height="38dp" android:layout_marginStart="4dp"
+            android:background="@drawable/bg_icon_btn" android:src="@drawable/ic_close"
+            android:padding="10dp"
+            android:tint="@color/text_dim"
+            android:contentDescription="Fermer"/>
+    </LinearLayout>
+
+    <View android:layout_width="match_parent" android:layout_height="1dp"
+        android:background="@drawable/bg_divider_cyan"/>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/recyclerView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp" android:layout_weight="1"
+        android:clipToPadding="false"
+        android:padding="6dp"
+        android:paddingBottom="16dp"/>
+
+</LinearLayout>

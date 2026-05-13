@@ -1,0 +1,21 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Monochrome HITIF cube — white silhouette with alpha shading for depth -->
+    <!-- Top face (brightest) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,3 L20,7.5 L12,12 L4,7.5 Z"/>
+    <!-- Left face (medium) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.6"
+        android:pathData="M4,7.5 L12,12 L12,19.5 L4,14.5 Z"/>
+    <!-- Right face (darkest) -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.3"
+        android:pathData="M20,7.5 L12,12 L12,19.5 L20,14.5 Z"/>
+</vector>

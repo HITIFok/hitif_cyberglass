@@ -1,0 +1,40 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="72dp" android:height="72dp"
+    android:viewportWidth="100" android:viewportHeight="100">
+    <!-- Top face -->
+    <path android:fillColor="#5500E5FF"
+          android:pathData="M50,8 L84,28 L50,48 L16,28 Z"/>
+    <!-- Left face -->
+    <path android:fillColor="#330055AA"
+          android:pathData="M16,28 L50,48 L50,84 L16,64 Z"/>
+    <!-- Right face -->
+    <path android:fillColor="#33BB00BB"
+          android:pathData="M84,28 L50,48 L50,84 L84,64 Z"/>
+    <!-- Outer edges cyan -->
+    <path android:fillColor="#00000000"
+          android:strokeColor="#00E5FF"
+          android:strokeWidth="1.8"
+          android:pathData="M50,8 L84,28 L84,64 L50,84 L16,64 L16,28 Z"/>
+    <!-- Inner diagonals -->
+    <path android:fillColor="#00000000"
+          android:strokeColor="#00E5FF"
+          android:strokeWidth="1.2"
+          android:strokeAlpha="0.4"
+          android:pathData="M50,8 L50,48 M50,48 L16,28 M50,48 L84,28 M50,48 L50,84"/>
+    <!-- Neon ring 1 -->
+    <path android:fillColor="#00000000"
+          android:strokeColor="#00E5FF" android:strokeWidth="1.5"
+          android:pathData="M26,81 A24,7 0 1,1 73.99,81 A24,7 0 1,1 26,81 Z"/>
+    <!-- Neon ring 2 -->
+    <path android:fillColor="#00000000"
+          android:strokeColor="#FF33FF" android:strokeWidth="1"
+          android:strokeAlpha="0.6"
+          android:pathData="M16,88.5 A34,8.5 0 1,1 83.99,88.5 A34,8.5 0 1,1 16,88.5 Z"/>
+    <!-- Download arrow -->
+    <path android:fillColor="#00000000"
+          android:strokeColor="#FFFFFF"
+          android:strokeWidth="2.5"
+          android:strokeLineCap="round"
+          android:strokeLineJoin="round"
+          android:pathData="M50,34 L50,60 M42,52 L50,61 L58,52"/>
+</vector>

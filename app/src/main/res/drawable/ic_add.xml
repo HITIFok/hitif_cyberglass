@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Plus icon in accent_cyan -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M12,5 L14,5 L14,11 L20,11 L20,13 L14,13 L14,19 L12,19 L12,13 L6,13 L6,11 L12,11 Z"/>
+</vector>

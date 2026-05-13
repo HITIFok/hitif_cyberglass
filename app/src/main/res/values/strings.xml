@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Video Download by HITIF</string>
+    <string name="app_name_short">HITIF</string>
+    <string name="address_hint">Rechercher ou saisir une URL…</string>
+    <string name="media_panel_title">VIDEO DOWNLOAD</string>
+    <string name="waiting_for_media">EN ATTENTE DE MÉDIAS…</string>
+    <string name="no_media_description">Naviguez sur une page contenant des vidéos</string>
+    <string name="download_started">Téléchargement lancé</string>
+    <string name="download_complete">Téléchargement terminé</string>
+    <string name="download_failed">Échec du téléchargement</string>
+    <string name="clear_list">Vider</string>
+    <string name="close">Fermer</string>
+    <string name="home_url">https://www.google.com</string>
+</resources>

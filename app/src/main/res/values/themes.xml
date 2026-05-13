@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- ── Main app theme ───────────────────────────────────────────── -->
+    <style name="Theme.HITIFBrowser" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/accent_cyan</item>
+        <item name="colorPrimaryVariant">@color/accent_cyan_dim</item>
+        <item name="colorOnPrimary">@color/bg_primary</item>
+        <item name="colorSecondary">@color/accent_magenta</item>
+        <item name="colorOnSecondary">@color/bg_primary</item>
+        <item name="colorSurface">@color/bg_surface</item>
+        <item name="colorOnSurface">@color/text_primary</item>
+        <item name="android:colorBackground">@color/bg_primary</item>
+        <item name="colorError">@color/status_error</item>
+        <item name="android:windowBackground">@color/bg_primary</item>
+        <item name="android:statusBarColor">@color/bg_primary</item>
+        <item name="android:navigationBarColor">@color/bg_toolbar</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+        <item name="shapeAppearanceSmallComponent">@style/ShapeAppearance.Glass.Small</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.Glass.Medium</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.Glass.Large</item>
+    </style>
+
+    <!-- ── Shape appearances ────────────────────────────────────────── -->
+    <style name="ShapeAppearance.Glass.Small" parent="ShapeAppearance.MaterialComponents.SmallComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">12dp</item>
+    </style>
+
+    <style name="ShapeAppearance.Glass.Medium" parent="ShapeAppearance.MaterialComponents.MediumComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">18dp</item>
+    </style>
+
+    <style name="ShapeAppearance.Glass.Large" parent="ShapeAppearance.MaterialComponents.LargeComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">24dp</item>
+    </style>
+
+    <!-- ── Bottom sheet theme ───────────────────────────────────────── -->
+    <style name="Theme.BottomSheet.Holo"
+           parent="Theme.MaterialComponents.BottomSheetDialog">
+        <item name="colorSurface">@color/bg_surface</item>
+        <item name="android:backgroundDimAmount">0.65</item>
+        <item name="bottomSheetStyle">@style/Widget.BottomSheet.Holo</item>
+    </style>
+
+    <style name="Widget.BottomSheet.Holo"
+           parent="Widget.MaterialComponents.BottomSheet.Modal">
+        <item name="backgroundTint">@android:color/transparent</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.BottomSheet.Holo</item>
+    </style>
+
+    <style name="ShapeAppearance.BottomSheet.Holo"
+           parent="ShapeAppearance.MaterialComponents.LargeComponent">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">28dp</item>
+        <item name="cornerSizeTopRight">28dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
+    <!-- ── ImageButton style ────────────────────────────────────────── -->
+    <style name="Widget.Toolbar.IconButton" parent="">
+        <item name="android:background">@drawable/bg_toolbar_btn</item>
+        <item name="android:tint">@color/text_dim</item>
+        <item name="android:padding">10dp</item>
+    </style>
+
+</resources>
