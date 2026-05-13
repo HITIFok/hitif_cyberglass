@@ -96,3 +96,24 @@ Stage Summary:
 - GitHub Actions build: SUCCESS
 - Root causes of crash: invalid <oval> in <vector> drawables (inflation crash at runtime)
 - Root causes of visual regression: truncated font certs + MaterialButton ignoring android:background
+---
+Task ID: 4
+Agent: Main Agent
+Task: Fix persistent APK crash on launch after CyberGlass UI overhaul
+
+Work Log:
+- Previous fix (d3098e9) addressed <oval> in <vector>, font certs, MaterialButton, CardView but crash persisted
+- Launched 3 parallel investigation agents: Kotlin source audit, drawable audit, full cross-reference check
+- ALL agents reported clean: no missing resources, no static init issues, no ProGuard issues (debug build)
+- Compared themes.xml before (5f079a0) vs after (68689a0) CyberGlass commit
+- Found ROOT CAUSE: themes.xml added `android:fontFamily` and `fontFamily` pointing to `@font/rajdhani_medium` (a downloadable font via Google Play Services). On devices without Google Play Services, the font provider throws RemoteException during theme inflation which crashes the Activity
+- Also found: `alertDialogTheme` pointed to custom `Theme.AlertDialog.Glass` with `bg_glass_card` as windowBackground - another potential crash vector
+- Fixed themes.xml: removed `android:fontFamily`/`fontFamily` from theme, removed `alertDialogTheme`
+- Font is still applied per-view in individual layouts (safe - system falls back gracefully)
+- Reverted font_certs.xml to original pre-CyberGlass version (was already working)
+
+Stage Summary:
+- 2 files modified: themes.xml, font_certs.xml
+- Commit 0aba4b4 pushed
+- GitHub Actions build: SUCCESS
+- Root cause: downloadable font in theme crashes on devices without Google Play Services
