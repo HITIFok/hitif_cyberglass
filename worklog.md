@@ -137,3 +137,30 @@ Stage Summary:
 - Build: SUCCESS on GitHub Actions
 - CyberGlass visual style preserved: colors, gradients, glass backgrounds, borders all intact
 - Only change: system font instead of Rajdhani/Orbitron custom fonts
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix AAPT build errors - replace percentage values with dp in drawable XMLs
+
+Work Log:
+- Cloned hitif_cyberglass repo from GitHub
+- Read all 10 problematic drawable files to understand percentage usage context
+- Identified root cause: AAPT does not support percentage values (e.g. '50%') for dimension attributes (top/bottom/left/right) on layer-list items
+- Fixed 10 files with 11 replacements:
+  - bg_address_bar.xml: bottom 50% -> 24dp (sheen covers top half)
+  - bg_bottom_sheet.xml: bottom 80% -> 64dp (sheen covers top 80%)
+  - bg_card_item.xml: bottom 60% -> 44dp (sheen covers top 60%)
+  - bg_divider_cyan.xml: removed top/bottom 33% (gradient already fades at edges)
+  - bg_divider_magenta.xml: removed top/bottom 33% (gradient already fades at edges)
+  - bg_history_header.xml: bottom 50% -> 24dp
+  - bg_icon_btn.xml: bottom 50% -> 22dp
+  - bg_icon_btn_cyan.xml: bottom 50% -> 24dp
+  - bg_panel_header.xml: top 98% -> gravity=bottom height=1.5dp, bottom 70% -> gravity=top height=40dp
+  - bg_toolbar.xml: bottom 70% -> gravity=top height=40dp
+- Verified no remaining percentage values in drawable directory
+- Committed as e03bdd7 and pushed to origin/main
+
+Stage Summary:
+- Build error fixed: all AAPT percentage incompatibility errors resolved
+- 10 drawable XML files corrected
+- Commit pushed: https://github.com/HITIFok/hitif_cyberglass/commit/e03bdd7
