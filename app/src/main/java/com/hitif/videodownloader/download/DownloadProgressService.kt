@@ -59,6 +59,9 @@ class DownloadProgressService : Service() {
     private var graceJob:   Job? = null
     private var databaseReady = false
 
+    /** URLs detected as potentially stale — confirmed FAILED only after 2 poll cycles */
+    private val pendingStale = mutableSetOf<String>()
+
     // ------------------------------------------------------------------ //
     //  Lifecycle
     // ------------------------------------------------------------------ //
@@ -146,13 +149,15 @@ class DownloadProgressService : Service() {
         val db = getDatabase() ?: return
         val now = System.currentTimeMillis()
 
-        // ── Source-of-truth stale detection ────────────────────────────────
+        // ── Source-of-truth stale detection (with grace period) ────────────
         //
         // Rule: a record is DOWNLOADING/QUEUED in the DB but the engine no
-        //       longer has it → the download ended (crashed, cancelled, etc.)
-        //       without calling onError(). Mark it FAILED.
-        //
-        // No time threshold. The engine set is always current.
+        //       longer has it → POTENTIALLY stale.
+        //       We wait 2 poll cycles (~3 s) before marking FAILED to give
+        //       the onComplete callback time to update the DB to COMPLETED.
+        //       This fixes the race condition where onComplete fires an async
+        //       DB update (scope.launch) but the engine removes the URL from
+        //       activeJobs immediately in its finally block.
         //
         val activeUrls = TurboDownloadEngine.getActiveUrls()
 
@@ -160,20 +165,28 @@ class DownloadProgressService : Service() {
             db.downloadDao().getRecent(200)
         } catch (_: Exception) { return }
 
-        allRecords
+        // Step 1: find records that appear stale THIS cycle
+        val newlyStaleUrls = allRecords
             .filter { record ->
                 (record.state == "DOWNLOADING" || record.state == "QUEUED") &&
-                record.url !in activeUrls   // engine finished but DB was never updated
+                record.url !in activeUrls
             }
-            .forEach { stale ->
-                try {
-                    db.downloadDao().updateStateByUrl(
-                        url   = stale.url,
-                        state = "FAILED",
-                        ts    = now
-                    )
-                } catch (_: Exception) {}
-            }
+            .map { it.url }
+            .toSet()
+
+        // Step 2: only confirm FAILED for URLs still stale after grace period
+        val confirmedFailed = pendingStale.intersect(newlyStaleUrls)
+        confirmedFailed.forEach { url ->
+            try {
+                db.downloadDao().updateStateByUrl(
+                    url = url, state = "FAILED", ts = now
+                )
+            } catch (_: Exception) {}
+        }
+
+        // Step 3: update pending set (newly stale minus already confirmed)
+        pendingStale.clear()
+        pendingStale.addAll(newlyStaleUrls - confirmedFailed)
 
         // ── Summary notification ────────────────────────────────────────────
         val activeRecords     = allRecords.filter { it.state == "DOWNLOADING" || it.state == "QUEUED" }
