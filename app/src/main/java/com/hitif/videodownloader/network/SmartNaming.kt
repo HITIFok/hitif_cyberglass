@@ -96,6 +96,7 @@ object SmartNaming {
                 // We have season/episode info
                 seriesName = extractSeriesName(item.pageTitle, se.raw)
                     ?: extractSeriesName(item.url.substringAfterLast('/').replace('-', ' '), se.raw)
+                    ?: extractSeriesFromPageUrl(item.pageUrl)
                     ?: pageTitle.ifBlank { "Serie" }
                 season  = se.season
                 episode = se.episode
@@ -174,13 +175,39 @@ object SmartNaming {
         return null
     }
 
-    /** Extract series name = text before the S/E marker */
+    /** Extract series name = text before the S/E marker (case-insensitive) */
     private fun extractSeriesName(text: String, seRaw: String): String? {
-        val idx = text.indexOf(seRaw)
+        val lowerText = text.lowercase()
+        val lowerRaw = seRaw.lowercase()
+        val idx = lowerText.indexOf(lowerRaw)
         if (idx <= 0) return null
         val before = text.substring(0, idx).trim()
             .trimEnd('-', '_', '.', '–', '—', ':', ' ')
         return before.takeIf { it.length >= 2 }
+    }
+
+    /** Extract series name from the page URL path (e.g. /2703-trigun-stargaze/episode-1.html) */
+    private fun extractSeriesFromPageUrl(pageUrl: String): String? {
+        try {
+            val path = pageUrl.substringBefore('?').substringBefore('#').trimEnd('/')
+            // Remove episode/season suffix from path
+            val epPattern = Regex(
+                """/(episode|ep|saison|season)[\s\-\–.]?\d{1,3}.*""",
+                RegexOption.IGNORE_CASE
+            )
+            val withoutEp = epPattern.replace(path, "")
+            val segments = withoutEp.split('/').filter { it.isNotBlank() }
+            if (segments.size >= 2) {
+                // Get the last meaningful segment (series slug)
+                val slug = segments.last()
+                val cleaned = slug
+                    .replace(Regex("""^\d{2,}[\-–]"""), "") // strip leading "2703-"
+                    .replace(Regex("[_\-]+"), " ")
+                    .trim()
+                return cleaned.takeIf { it.length >= 3 }
+            }
+        } catch (_: Exception) {}
+        return null
     }
 
     private fun cleanTitle(raw: String): String {
@@ -225,18 +252,27 @@ object SmartNaming {
 
         for (item in items) {
             val nr = build(item)
-            if (nr.seriesName != null && nr.season != null && nr.episode != null) {
-                val key = nr.seriesName.lowercase().trim()
-                result.getOrPut(key) { mutableListOf() }.add(
-                    EpisodeCandidate(
-                        item       = item,
-                        seriesName = nr.seriesName,
-                        season     = nr.season,
-                        episode    = nr.episode,
-                        label      = "S${nr.season.toString().padStart(2,'0')}E${nr.episode.toString().padStart(2,'0')}"
-                    )
+            // Must have series name AND episode number
+            // Season is optional — default to 1 (common for anime with only episode numbers)
+            val ep = nr.episode ?: continue
+            val sn = nr.seriesName ?: continue
+            val s = nr.season ?: 1
+
+            val key = sn.lowercase().trim()
+            val label = if (nr.season != null)
+                "S${s.toString().padStart(2,'0')}E${ep.toString().padStart(2,'0')}"
+            else
+                "E${ep.toString().padStart(2,'0')}"
+
+            result.getOrPut(key) { mutableListOf() }.add(
+                EpisodeCandidate(
+                    item       = item,
+                    seriesName = sn,
+                    season     = s,
+                    episode    = ep,
+                    label      = label
                 )
-            }
+            )
         }
 
         // Only return groups with ≥ 2 episodes
