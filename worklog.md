@@ -72,3 +72,27 @@ Stage Summary:
 - Build should now succeed on GitHub Actions
 - Commit: f71b6f1 pushed to https://github.com/HITIFok/hitif_android
 
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix APK crash on launch after CyberGlass UI overhaul
+
+Work Log:
+- Analyzed commit 68689a7 (CyberGlass UI overhaul) as source of crash
+- Launched 3 parallel sub-agents to audit: drawables, layouts, manifest/Kotlin code
+- Found CRITICAL: <oval> elements inside <vector> in ic_launcher_foreground.xml (line 25) and ic_holo_cube_large.xml (lines 25-31) - <oval> is invalid inside <vector>, causes runtime inflation crash
+- Found CRITICAL: font_certs.xml had truncated/invalid Google Fonts certificates (~400 bytes each vs ~1200-1600 bytes required), fonts would fail to download
+- Found BUG: 7 <Button> elements using android:background which is silently ignored by MaterialButton (Material Components theme auto-inflates <Button> as MaterialButton)
+- Found BUG: item_media.xml used androidx.cardview.widget.CardView with app:strokeColor/app:strokeWidth which only work on MaterialCardView
+- Fixed ic_launcher_foreground.xml: replaced <oval> with <path> using elliptical arc (M34,75 A20,5 0 1,1 73.99,75 Z)
+- Fixed ic_holo_cube_large.xml: replaced 2 <oval> elements with <path> using elliptical arc paths
+- Fixed font_certs.xml: replaced truncated certificates with full valid Google Fonts provider certificates
+- Changed 7 <Button> to <android.widget.Button> in: activity_browser.xml, fragment_history.xml, fragment_tab_switcher.xml, fragment_season.xml, fragment_media_panel.xml
+- Changed CardView to MaterialCardView in item_media.xml
+- Ran comprehensive cross-reference audit: all 44 drawables, 70 colors, 2 fonts, 15 layouts, all Kotlin R.* references verified - zero dangling references
+
+Stage Summary:
+- 9 files modified, commit d3098e9 pushed
+- GitHub Actions build: SUCCESS
+- Root causes of crash: invalid <oval> in <vector> drawables (inflation crash at runtime)
+- Root causes of visual regression: truncated font certs + MaterialButton ignoring android:background
