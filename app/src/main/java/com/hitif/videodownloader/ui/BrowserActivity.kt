@@ -175,12 +175,7 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
             else binding.webView.reload()
         }
         binding.btnHome.setOnClickListener    { binding.webView.loadUrl(HOME_URL) }
-        binding.btnNewTab.setOnClickListener {
-            val tab = vm.newTab()
-            vm.clearMedia()
-            binding.addressBar.setText(tab.url)
-            binding.webView.loadUrl(tab.url)
-        }
+        binding.btnNewTab.setOnClickListener { openTabSwitcher() }
         binding.btnMedia.setOnClickListener   { openMediaPanel() }
         binding.btnSeason.setOnClickListener { openSeasonDialog() }
         binding.btnHistory.setOnClickListener { openHistory() }
@@ -299,11 +294,11 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
             }
         }
 
-        // Show tab count badge
+        // Show tab count badge (always visible when tabs exist)
         vm.tabsLiveData.observe(this) { tabs ->
             val count = tabs.size
-            binding.btnTabBadge.text = if (count > 1) count.toString() else ""
-            binding.btnTabBadge.isVisible = count > 1
+            binding.btnTabBadge.text = count.toString()
+            binding.btnTabBadge.isVisible = count >= 1
         }
     }
 
