@@ -11,6 +11,8 @@ import com.hitif.videodownloader.network.SmartNaming
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.io.File
 import java.net.URL
 
@@ -19,16 +21,21 @@ import java.net.URL
  * (HlsDownloader or TurboDownloadEngine), never through Android DownloadManager.
  * Progress is tracked via Room DB + DownloadNotificationManager.
  *
- * FIX: onProgress is now called with totalBytes as soon as the HEAD response
- * arrives (before any byte is downloaded), and updateExpectedSizeByUrl() is
- * called to persist that size immediately. This fixes the "0 KB / — shown
- * until download starts streaming" bug in both the notification and the history.
+ * Concurrency: A semaphore limits simultaneous downloads to MAX_CONCURRENT.
+ * Extra items are queued and start automatically as others finish.
+ * This prevents connection saturation when downloading entire seasons.
  */
 object DownloadHelper {
 
     private const val TAG = "DownloadHelper"
     private val scope = CoroutineScope(Dispatchers.IO)
 
+    /** Max simultaneous downloads. Each download may use up to 4 chunks,
+     *  so 2 concurrent = 8 connections max (within OkHttp pool of 8). */
+    private const val MAX_CONCURRENT = 2
+    private val downloadSemaphore = Semaphore(MAX_CONCURRENT)
+
+    @Volatile
     private var initialized = false
 
     fun init(context: android.content.Context) {
@@ -47,13 +54,77 @@ object DownloadHelper {
         }
     }
 
+    // =========================================================================
+    // Public API
+    // =========================================================================
+
+    /** Single download — starts immediately (bypasses semaphore). */
     fun enqueue(context: android.content.Context, item: MediaItem): Long {
         if (!initialized) init(context)
         val naming = SmartNaming.build(item)
-        return when (item.mediaType) {
-            MediaType.HLS -> downloadHls(context, item, naming)
-            else          -> downloadDirect(context, item, naming)
+        return startDownload(context, item, naming, insertDb = true)
+    }
+
+    /**
+     * Batch download (season packs, "Download All") with concurrency control.
+     * Only MAX_CONCURRENT downloads run at a time; the rest wait in a queue.
+     * All items appear immediately in history as QUEUED, then transition to
+     * DOWNLOADING as slots become available.
+     */
+    fun enqueueBatch(
+        context: android.content.Context,
+        items: List<MediaItem>
+    ): List<Pair<MediaItem, Long>> {
+        if (!initialized) init(context)
+        val db = AppDatabase.getInstance(context)
+        val results = mutableListOf<Pair<MediaItem, Long>>()
+
+        for (item in items) {
+            val naming = SmartNaming.build(item)
+            val safeFilename = when (item.mediaType) {
+                MediaType.HLS -> sanitizeFilename(naming.filename)
+                else          -> naming.filename
+            }
+
+            // Insert immediately as QUEUED so user sees all episodes in history
+            scope.launch {
+                try {
+                    db.downloadDao().insert(
+                        DownloadRecord(
+                            downloadManagerId = -1L,
+                            url = item.url, filename = safeFilename,
+                            pageTitle = item.pageTitle, pageUrl = item.pageUrl,
+                            mimeType = item.mimeType, mediaType = item.mediaType.name,
+                            sizeBytes = item.sizeBytes,
+                            seriesName = naming.seriesName, season = naming.season,
+                            episode = naming.episode,
+                            state = "QUEUED", startedAt = System.currentTimeMillis()
+                        )
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to insert batch record: ${e.message}")
+                }
+                ensureService(context)
+            }
+
+            // Wait for a semaphore slot, then start the actual download
+            scope.launch {
+                downloadSemaphore.withPermit {
+                    // Move from QUEUED → DOWNLOADING now that we have a slot
+                    try {
+                        db.downloadDao().updateStateByUrl(
+                            url = item.url, state = "DOWNLOADING",
+                            ts = System.currentTimeMillis()
+                        )
+                    } catch (_: Exception) {}
+
+                    startDownload(context, item, naming, insertDb = false)
+                }
+            }
+
+            results.add(item to -1L)
         }
+        return results
     }
 
     fun cancel(url: String) {
@@ -66,11 +137,25 @@ object DownloadHelper {
         HlsDownloader.cancelAll()
     }
 
-    fun enqueueBatch(
+    // =========================================================================
+    // Internal — unified download starter
+    // =========================================================================
+
+    /**
+     * Start a download. If [insertDb] is true, a DOWNLOADING record is
+     * inserted into the DB (used for single downloads from enqueue).
+     * If false, the record was already inserted by enqueueBatch.
+     */
+    private fun startDownload(
         context: android.content.Context,
-        items: List<MediaItem>
-    ): List<Pair<MediaItem, Long>> {
-        return items.map { item -> item to enqueue(context, item) }
+        item: MediaItem,
+        naming: SmartNaming.NameResult,
+        insertDb: Boolean
+    ): Long {
+        return when (item.mediaType) {
+            MediaType.HLS -> downloadHls(context, item, naming, insertDb)
+            else          -> downloadDirect(context, item, naming, insertDb)
+        }
     }
 
     // ========================================================================
@@ -80,31 +165,36 @@ object DownloadHelper {
     private fun downloadHls(
         context: android.content.Context,
         item: MediaItem,
-        naming: SmartNaming.NameResult
+        naming: SmartNaming.NameResult,
+        insertDb: Boolean
     ): Long {
         val subDir = buildSubDir(item)
         val safeFilename = sanitizeFilename(naming.filename)
         val headers = buildHeaders(item)
         val db = AppDatabase.getInstance(context)
 
-        scope.launch {
-            try {
-                db.downloadDao().insert(
-                    DownloadRecord(
-                        downloadManagerId = -1L,
-                        url = item.url, filename = safeFilename,
-                        pageTitle = item.pageTitle, pageUrl = item.pageUrl,
-                        mimeType = "video/mp4", mediaType = MediaType.HLS.name,
-                        sizeBytes = item.sizeBytes,
-                        seriesName = naming.seriesName, season = naming.season,
-                        episode = naming.episode,
-                        state = "DOWNLOADING", startedAt = System.currentTimeMillis()
+        if (insertDb) {
+            scope.launch {
+                try {
+                    db.downloadDao().insert(
+                        DownloadRecord(
+                            downloadManagerId = -1L,
+                            url = item.url, filename = safeFilename,
+                            pageTitle = item.pageTitle, pageUrl = item.pageUrl,
+                            mimeType = "video/mp4", mediaType = MediaType.HLS.name,
+                            sizeBytes = item.sizeBytes,
+                            seriesName = naming.seriesName, season = naming.season,
+                            episode = naming.episode,
+                            state = "DOWNLOADING", startedAt = System.currentTimeMillis()
+                        )
                     )
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to insert HLS record: ${e.message}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to insert HLS record: ${e.message}")
+                }
+                ensureService(context)
             }
-            ensureService(context)
+        } else {
+            scope.launch { ensureService(context) }
         }
 
         val throttler = DbThrottler(db, item.url, scope)
@@ -123,7 +213,6 @@ object DownloadHelper {
                         )
                     } catch (_: Exception) {}
 
-                    // FIX: persist content-length as soon as it is known
                     if (progress.totalBytes > 0 && progress.bytesDownloaded == 0L) {
                         scope.launch {
                             try {
@@ -182,7 +271,8 @@ object DownloadHelper {
     private fun downloadDirect(
         context: android.content.Context,
         item: MediaItem,
-        naming: SmartNaming.NameResult
+        naming: SmartNaming.NameResult,
+        insertDb: Boolean
     ): Long {
         val subDir = buildSubDir(item, naming)
         val safeFilename = naming.filename
@@ -194,24 +284,28 @@ object DownloadHelper {
         val headers = buildHeaders(item)
         val db = AppDatabase.getInstance(context)
 
-        scope.launch {
-            try {
-                db.downloadDao().insert(
-                    DownloadRecord(
-                        downloadManagerId = -1L,
-                        url = item.url, filename = safeFilename,
-                        pageTitle = item.pageTitle, pageUrl = item.pageUrl,
-                        mimeType = item.mimeType, mediaType = item.mediaType.name,
-                        sizeBytes = item.sizeBytes,
-                        seriesName = naming.seriesName, season = naming.season,
-                        episode = naming.episode,
-                        state = "DOWNLOADING", startedAt = System.currentTimeMillis()
+        if (insertDb) {
+            scope.launch {
+                try {
+                    db.downloadDao().insert(
+                        DownloadRecord(
+                            downloadManagerId = -1L,
+                            url = item.url, filename = safeFilename,
+                            pageTitle = item.pageTitle, pageUrl = item.pageUrl,
+                            mimeType = item.mimeType, mediaType = item.mediaType.name,
+                            sizeBytes = item.sizeBytes,
+                            seriesName = naming.seriesName, season = naming.season,
+                            episode = naming.episode,
+                            state = "DOWNLOADING", startedAt = System.currentTimeMillis()
+                        )
                     )
-                )
-            } catch (e: Exception) {
-                Log.e(TAG, "Failed to insert direct record: ${e.message}")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Failed to insert direct record: ${e.message}")
+                }
+                ensureService(context)
             }
-            ensureService(context)
+        } else {
+            scope.launch { ensureService(context) }
         }
 
         val throttler = DbThrottler(db, item.url, scope)
@@ -229,9 +323,6 @@ object DownloadHelper {
                         )
                     } catch (_: Exception) {}
 
-                    // FIX: as soon as content-length arrives (first progress callback
-                    // where bytesDownloaded == 0 and totalBytes > 0), persist the
-                    // expected file size so the UI shows it immediately.
                     if (progress.totalBytes > 0 && progress.bytesDownloaded == 0L) {
                         scope.launch {
                             try {
