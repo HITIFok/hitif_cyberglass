@@ -117,3 +117,23 @@ Stage Summary:
 - Commit 0aba4b4 pushed
 - GitHub Actions build: SUCCESS
 - Root cause: downloadable font in theme crashes on devices without Google Play Services
+---
+Task ID: 5
+Agent: Main Agent
+Task: Fix APK crash on launch - CyberGlass progressive re-apply (4th attempt)
+
+Work Log:
+- Identified root cause: ALL @font/rajdhani_medium and @font/orbitron references in layouts point to DOWNLOADABLE fonts via Google Play Services (fontProviderAuthority=com.google.android.gms.fonts)
+- On devices without Google Play Services, every @font/ reference triggers RemoteException → crash
+- Previous fixes only removed font from THEME but kept per-view references (incorrect assumption that per-view was safe)
+- Removed all 60 font references from 15 layout files
+- Deleted downloadable font XML definitions (rajdhani_medium.xml, orbitron.xml)
+- Attempted to bundle fonts as .ttf files but download sources failed (files too large for CDN)
+- Committed fix: 8145564
+
+Stage Summary:
+- Root cause of 4th crash: Downloadable fonts via Google Play Services crash on devices without GMS
+- 17 files changed, 60 font references removed, 2 font XML definitions deleted
+- Build: SUCCESS on GitHub Actions
+- CyberGlass visual style preserved: colors, gradients, glass backgrounds, borders all intact
+- Only change: system font instead of Rajdhani/Orbitron custom fonts
