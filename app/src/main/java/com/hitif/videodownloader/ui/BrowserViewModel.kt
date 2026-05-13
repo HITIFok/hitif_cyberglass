@@ -42,6 +42,13 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
 
     private val _seenUrls = mutableSetOf<String>()
 
+    /**
+     * Base URL of the last page where media was detected.
+     * Used to accumulate media across episode pages of the same series.
+     * e.g. "/anime-vf/2703-trigun/" stays the same across episode-1, episode-2, etc.
+     */
+    private var lastMediaBase: String = ""
+
     val detector = MediaDetector { item ->
         val key = item.url.substringBefore('?')
         synchronized(_seenUrls) {
@@ -58,6 +65,68 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     fun onPageNavigated(url: String, title: String) {
         pageUrl.postValue(url)
         pageTitle.postValue(title)
+    }
+
+    /**
+     * Smart media clearing: only clears detected media when navigating to
+     * a DIFFERENT series/site. Keeps media when navigating between episodes
+     * of the same anime (same base path).
+     *
+     * Example:
+     *  episode-1.html → episode-2.html  → KEEP media (same base)
+     *  episode-2.html → google.com       → CLEAR media (different base)
+     */
+    fun clearMediaIfNeeded(url: String) {
+        val newBase = extractSeriesBase(url)
+        if (newBase != lastMediaBase && lastMediaBase.isNotEmpty()) {
+            // Navigating to a different series/site — clear everything
+            clearMedia()
+        }
+        // Update base even if we didn't clear — next navigation will compare against this
+        // (we set it after onPageFinished so the current page's media gets detected first)
+    }
+
+    /** Call this from onPageFinished so the base is set AFTER media detection starts */
+    fun updateMediaBase(url: String) {
+        val newBase = extractSeriesBase(url)
+        if (newBase.isNotEmpty()) {
+            lastMediaBase = newBase
+        }
+    }
+
+    /**
+     * Extract the "series base" from a URL — the parent directory of an episode page.
+     * e.g. "https://ww.animesultra.org/anime-vf/2703-trigun/episode-1.html"
+     *   → "ww.animesultra.org/anime-vf/2703-trigun"
+     *
+     * For non-episode URLs, returns the host + first 2 path segments.
+     */
+    private fun extractSeriesBase(url: String): String {
+        try {
+            val withoutQuery = url.substringBefore('?').substringBefore('#').trimEnd('/')
+            val host = withoutQuery.substringAfter("://").substringBefore('/')
+
+            // Remove episode-like suffix: /episode-1, /ep-2, /saison-1, etc.
+            val path = withoutQuery.substringAfter("://").substringAfter('/')
+            val stripped = path.replace(
+                Regex("""/(episode|ep|saison|season)[\s\-–.]?\d{1,3}.*$""", RegexOption.IGNORE_CASE),
+                ""
+            ).trimEnd('/')
+
+            // Also strip trailing /0-... common in some anime sites
+            val clean = stripped.replace(
+                Regex("""/\d{2,}[\-–].*$"""),
+                ""
+            ).trimEnd('/')
+
+            return if (clean.length >= host.length) {
+                "$host/$clean"
+            } else {
+                host
+            }
+        } catch (_: Exception) {
+            return url.substringBefore('?').substringBefore('/')
+        }
     }
 
     private fun recomputeSeasonGroups(currentItems: List<MediaItem>) {

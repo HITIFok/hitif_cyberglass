@@ -97,7 +97,7 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
             }
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                 vm.isLoading.postValue(true)
-                vm.clearMedia()
+                vm.clearMediaIfNeeded(url)
                 binding.addressBar.setText(url)
                 binding.progressBar.isVisible = true
             }
@@ -108,6 +108,7 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
                 binding.progressBar.isVisible = false
                 val title = view.title ?: ""
                 vm.onPageNavigated(url, title)
+                vm.updateMediaBase(url)
                 vm.updateCurrentTab(url, title)
                 view.evaluateJavascript(JsBridge.INJECT_SCRIPT, null)
             }
