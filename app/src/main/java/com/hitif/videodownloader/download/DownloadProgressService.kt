@@ -71,7 +71,8 @@ class DownloadProgressService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
+        // Notification channel is already created by DownloadNotificationManager.init()
+        // in App.onCreate(), no need to create it again here.
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

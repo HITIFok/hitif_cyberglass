@@ -215,7 +215,7 @@ object HlsDownloader {
                 val deferreds = batch.mapIndexed { segIdx, segUrl ->
                     async(Dispatchers.IO) {
                         val globalIdx = batchIdx * PARALLEL_SEGMENTS + segIdx
-                        val tempFile = File(context.cacheDir, "hls_${m3u8Url.hashCode()}_seg_$globalIdx.tmp")
+                        val tempFile = File(context.cacheDir, "hls_${System.nanoTime()}_$globalIdx.tmp")
                         tempFiles.add(tempFile)
                         downloadSegment(segUrl, headers, tempFile, totalBytes)
                         completedSegments.incrementAndGet()

@@ -11,6 +11,7 @@ import com.hitif.videodownloader.network.SmartNaming
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import java.io.File
@@ -227,15 +228,18 @@ object DownloadHelper {
 
                 override fun onComplete(file: File) {
                     try {
-                        scope.launch {
-                            try {
+                        // Synchronous DB update — must complete BEFORE the engine's
+                        // finally block removes the URL from activeJobs, otherwise
+                        // DownloadProgressService would false-positive FAILED.
+                        try {
+                            runBlocking {
                                 db.downloadDao().completeDownloadByUrl(
                                     url = item.url, state = "COMPLETED",
                                     ts = System.currentTimeMillis(), fileSize = file.length()
                                 )
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Failed to complete HLS record: ${e.message}")
                             }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to complete HLS record: ${e.message}")
                         }
                         DownloadNotificationManager.showComplete(item.url, safeFilename, file.length())
                     } catch (_: Exception) {}
@@ -338,18 +342,23 @@ object DownloadHelper {
 
                 override fun onComplete(file: File) {
                     try {
-                        scope.launch {
-                            try {
+                        // Synchronous DB update — must complete BEFORE the engine's
+                        // finally block removes the URL from activeJobs, otherwise
+                        // DownloadProgressService would false-positive FAILED.
+                        try {
+                            runBlocking {
                                 db.downloadDao().completeDownloadByUrl(
                                     url = item.url, state = "COMPLETED",
                                     ts = System.currentTimeMillis(), fileSize = file.length()
                                 )
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Failed to complete direct record: ${e.message}")
                             }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed to complete direct record: ${e.message}")
                         }
                         DownloadNotificationManager.showComplete(item.url, safeFilename, file.length())
-                        DownloadNotificationManager.dismiss(item.url)
+                        // Do NOT dismiss here — showComplete already sets autoCancel.
+                        // The previous dismiss() call was cancelling the completion
+                        // notification before the user could see it.
 
                         val ext = safeFilename.substringAfterLast('.', "mp4")
                         val mimeMap = mapOf(
@@ -357,7 +366,8 @@ object DownloadHelper {
                             "mkv"  to "video/x-matroska",
                             "webm" to "video/webm",
                             "mp3"  to "audio/mpeg",
-                            "m4a"  to "audio/mp4"
+                            "m4a"  to "audio/mp4",
+                            "ts"   to "video/mp2t"
                         )
                         android.media.MediaScannerConnection.scanFile(
                             context, arrayOf(file.absolutePath),
@@ -444,7 +454,7 @@ object DownloadHelper {
 
     private fun sanitizeFilename(name: String): String {
         return name.removeSuffix(".m3u8").removeSuffix(".mpd").removeSuffix(".m3u")
-            .let { if (it.endsWith(".mp4")) it else "$it.mp4" }
+            .let { if (it.endsWith(".ts")) it else "$it.ts" }
     }
 
     /** Throttles DB writes to at most once per second */

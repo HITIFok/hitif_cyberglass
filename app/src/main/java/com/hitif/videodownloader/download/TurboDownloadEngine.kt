@@ -423,7 +423,7 @@ object TurboDownloadEngine {
                               else start + chunkSize - 1
                     val tempFile = File(
                         context.cacheDir,
-                        "turbo_${url.hashCode()}_chunk_$index.tmp"
+                        "turbo_${System.nanoTime()}_${index}.tmp"
                     )
                     synchronized(tempFiles) { tempFiles.add(tempFile) }
                     downloadChunk(url, headers, start, end, tempFile, atomics)
