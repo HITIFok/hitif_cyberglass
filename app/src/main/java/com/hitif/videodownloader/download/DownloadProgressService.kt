@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.hitif.videodownloader.R
@@ -34,8 +35,11 @@ class DownloadProgressService : Service() {
 
     companion object {
         const val CHANNEL_ID       = "hitif_download_channel"
-        private const val GRACE_PERIOD_MS  = 8_000L
-        private const val POLL_INTERVAL_MS = 1_500L
+        private const val GRACE_PERIOD_MS  = 15_000L
+        private const val POLL_INTERVAL_MS = 2_000L
+        /** Number of consecutive stale cycles before marking FAILED.
+         *  Set to 6 to survive process restart (START_STICKY ~5s restart delay). */
+        private const val STALE_THRESHOLD  = 6
 
         @Volatile private var isRunning = false
 
@@ -59,9 +63,10 @@ class DownloadProgressService : Service() {
     private var pollingJob: Job? = null
     private var graceJob:   Job? = null
     private var databaseReady = false
+    @Volatile private var serviceWakeLock: PowerManager.WakeLock? = null
 
-    /** URLs detected as potentially stale — confirmed FAILED only after 3 poll cycles (~4.5s) */
-    private val pendingStale = mutableSetOf<String>()
+    /** URL → consecutive stale cycle count. Marked FAILED only after STALE_THRESHOLD cycles. */
+    private val staleCycleCount = mutableMapOf<String, Int>()
     /** URLs still warming up — seen as DOWNLOADING but not yet in engine (give insert time) */
     private val warmingUp = mutableSetOf<String>()
 
@@ -94,6 +99,7 @@ class DownloadProgressService : Service() {
         } catch (_: Exception) {}
 
         startForegroundCompat(1000, builder.build())
+        acquireServiceWakeLock()
         startPolling()
         return START_STICKY
     }
@@ -104,10 +110,34 @@ class DownloadProgressService : Service() {
         databaseReady = false
         pollingJob?.cancel()
         graceJob?.cancel()
+        releaseServiceWakeLock()
         try { DownloadNotificationManager.dismissAll() } catch (_: Exception) {}
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    // ------------------------------------------------------------------ //
+    //  Service-level WakeLock
+    // ------------------------------------------------------------------ //
+
+    private fun acquireServiceWakeLock() {
+        if (serviceWakeLock?.isHeld == true) return
+        try {
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            serviceWakeLock = pm.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "hitif:progress_service_wakelock"
+            ).apply {
+                setReferenceCounted(false)
+                acquire(30 * 60 * 1000L /* 30 min max */)
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun releaseServiceWakeLock() {
+        try { serviceWakeLock?.release() } catch (_: Exception) {}
+        serviceWakeLock = null
+    }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -157,14 +187,20 @@ class DownloadProgressService : Service() {
         //
         // Rule: a record is DOWNLOADING/QUEUED in the DB but the engine no
         //       longer has it → POTENTIALLY stale.
-        //       We wait 3 poll cycles (~4.5 s) before marking FAILED to give
+        //       We wait 6 poll cycles (~9 s) before marking FAILED to give
         //       the onComplete callback time to update the DB to COMPLETED.
         //       This fixes the race condition where onComplete fires an async
         //       DB update (scope.launch) but the engine removes the URL from
         //       activeJobs immediately in its finally block.
         //
-        //       Also: newly inserted DOWNLOADING records get a 1-cycle warm-up
+        //       Also: newly inserted DOWNLOADING records get a 2-cycle warm-up
         //       to prevent false positives on slow devices.
+        //
+        //       IMPORTANT: After a process kill+restart (START_STICKY), all
+        //       in-memory engine state is lost. DOWNLOADING records from the
+        //       DB may still be valid — the user needs to see them. We do NOT
+        //       mark them FAILED immediately. The extended grace period gives
+        //       the user time to return to the app and take action.
         //
         val activeUrls = TurboDownloadEngine.getActiveUrls() + HlsDownloader.getActiveUrls()
 
@@ -182,7 +218,7 @@ class DownloadProgressService : Service() {
             .map { it.url }
             .toSet()
 
-        // Step 2: add newly-seen DOWNLOADING URLs to warm-up set
+        // Step 2: add newly-seen DOWNLOADING URLs to warm-up set (2 cycles grace)
         val activeInDb = allRecords
             .filter { it.state == "DOWNLOADING" || it.state == "QUEUED" }
             .map { it.url }
@@ -190,19 +226,28 @@ class DownloadProgressService : Service() {
         val newInEngine = activeUrls.filter { it in activeInDb && it !in warmingUp }
         warmingUp.addAll(newInEngine)
 
-        // Step 3: only confirm FAILED for URLs still stale after 3 cycles
-        val confirmedFailed = pendingStale.intersect(newlyStaleUrls)
+        // Step 3: increment stale counters, confirm FAILED only after STALE_THRESHOLD
+        val confirmedFailed = mutableListOf<String>()
+        for (url in newlyStaleUrls) {
+            val count = (staleCycleCount[url] ?: 0) + 1
+            staleCycleCount[url] = count
+            if (count >= STALE_THRESHOLD) {
+                confirmedFailed.add(url)
+            }
+        }
         confirmedFailed.forEach { url ->
             try {
                 db.downloadDao().updateStateByUrl(
                     url = url, state = "FAILED", ts = now
                 )
             } catch (_: Exception) {}
+            staleCycleCount.remove(url)
         }
 
-        // Step 4: update pending set (newly stale minus already confirmed, minus warm-up)
-        pendingStale.clear()
-        pendingStale.addAll(newlyStaleUrls - confirmedFailed)
+        // Step 4: reset counters for URLs no longer stale (re-appeared in engine)
+        for (url in staleCycleCount.keys.toList()) {
+            if (url !in newlyStaleUrls) staleCycleCount.remove(url)
+        }
 
         // Step 5: clean warm-up URLs that are now in the engine
         warmingUp.removeAll(activeUrls)

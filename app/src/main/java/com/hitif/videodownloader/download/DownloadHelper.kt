@@ -1,6 +1,11 @@
 package com.hitif.videodownloader.download
 
+import android.content.Context
+import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import android.webkit.CookieManager
 import com.hitif.videodownloader.db.AppDatabase
@@ -16,6 +21,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import java.io.File
 import java.net.URL
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Download orchestrator — ALL downloads go through our own pipeline
@@ -39,14 +45,87 @@ object DownloadHelper {
     @Volatile
     private var initialized = false
 
-    fun init(context: android.content.Context) {
+    /** Active download count — used to manage the WakeLock lifecycle. */
+    private val activeDownloadCount = AtomicInteger(0)
+    @Volatile private var wakeLock: PowerManager.WakeLock? = null
+    @Volatile private var batteryExemptionRequested = false
+
+    fun init(context: Context) {
         if (initialized) return
         initialized = true
         DownloadNotificationManager.init(context)
+        requestBatteryOptimizationExemption(context)
+    }
+
+    // -----------------------------------------------------------------------
+    // WakeLock — keeps CPU alive during background downloads
+    // -----------------------------------------------------------------------
+
+    private fun acquireWakeLock(context: Context) {
+        if (wakeLock?.isHeld == true) return
+        try {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "hitif:download_wakelock"
+            ).apply {
+                setReferenceCounted(false)
+                acquire(30 * 60 * 1000L /* 30 min max, Android safety */)
+            }
+            Log.d(TAG, "WakeLock acquired for background downloads")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to acquire WakeLock: ${e.message}")
+        }
+    }
+
+    private fun releaseWakeLock() {
+        try {
+            wakeLock?.release()
+        } catch (_: Exception) {}
+        wakeLock = null
+        Log.d(TAG, "WakeLock released")
+    }
+
+    /** Called when a download starts — increments counter and acquires WakeLock. */
+    fun onDownloadStarted(context: Context) {
+        if (activeDownloadCount.incrementAndGet() == 1) {
+            acquireWakeLock(context)
+        }
+    }
+
+    /** Called when a download ends — decrements counter and releases WakeLock if idle. */
+    fun onDownloadEnded() {
+        if (activeDownloadCount.decrementAndGet() <= 0) {
+            activeDownloadCount.set(0)
+            releaseWakeLock()
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Battery optimization exemption
+    // -----------------------------------------------------------------------
+
+    private fun requestBatteryOptimizationExemption(context: Context) {
+        if (batteryExemptionRequested) return
+        batteryExemptionRequested = true
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        try {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (pm.isIgnoringBatteryOptimizations(context.packageName)) return
+            // Show a system dialog asking the user to allow background operation
+            val intent = android.content.Intent(
+                Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                Uri.parse("package:${context.packageName}")
+            ).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            Log.d(TAG, "Battery optimization exemption dialog shown")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not request battery exemption: ${e.message}")
+        }
     }
 
     @Synchronized
-    private fun ensureService(context: android.content.Context) {
+    private fun ensureService(context: Context) {
         if (!initialized) init(context)
         try {
             DownloadProgressService.start(context)
@@ -199,6 +278,7 @@ object DownloadHelper {
         }
 
         val throttler = DbThrottler(db, item.url, scope)
+        onDownloadStarted(context)
 
         HlsDownloader.download(
             context = context, m3u8Url = item.url,
@@ -227,25 +307,24 @@ object DownloadHelper {
                 }
 
                 override fun onComplete(file: File) {
+                    onDownloadEnded()
                     try {
-                        // Synchronous DB update — must complete BEFORE the engine's
-                        // finally block removes the URL from activeJobs, otherwise
-                        // DownloadProgressService would false-positive FAILED.
-                        try {
-                            runBlocking {
-                                db.downloadDao().completeDownloadByUrl(
-                                    url = item.url, state = "COMPLETED",
-                                    ts = System.currentTimeMillis(), fileSize = file.length()
-                                )
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to complete HLS record: ${e.message}")
+                        runBlocking {
+                            db.downloadDao().completeDownloadByUrl(
+                                url = item.url, state = "COMPLETED",
+                                ts = System.currentTimeMillis(), fileSize = file.length()
+                            )
                         }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to complete HLS record: ${e.message}")
+                    }
+                    try {
                         DownloadNotificationManager.showComplete(item.url, safeFilename, file.length())
                     } catch (_: Exception) {}
                 }
 
                 override fun onError(error: Throwable) {
+                    onDownloadEnded()
                     Log.e(TAG, "HLS error: ${error.message}", error)
                     try {
                         scope.launch {
@@ -313,6 +392,7 @@ object DownloadHelper {
         }
 
         val throttler = DbThrottler(db, item.url, scope)
+        onDownloadStarted(context)
 
         TurboDownloadEngine.download(
             context = context, url = item.url, destPath = destPath, headers = headers,
@@ -341,11 +421,8 @@ object DownloadHelper {
                 }
 
                 override fun onComplete(file: File) {
+                    onDownloadEnded()
                     try {
-                        // Synchronous DB update — must complete BEFORE the engine's
-                        // finally block removes the URL from activeJobs, otherwise
-                        // DownloadProgressService would false-positive FAILED.
-                        try {
                             runBlocking {
                                 db.downloadDao().completeDownloadByUrl(
                                     url = item.url, state = "COMPLETED",
@@ -377,6 +454,7 @@ object DownloadHelper {
                 }
 
                 override fun onError(error: Throwable) {
+                    onDownloadEnded()
                     Log.e(TAG, "Direct download error: ${error.message}", error)
                     try {
                         scope.launch {
