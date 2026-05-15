@@ -26,8 +26,9 @@ import kotlinx.coroutines.launch
  *
  * Stale detection logic (simple & correct):
  *   A DB record marked DOWNLOADING or QUEUED is truly failed if and only if
- *   its URL is NOT present in TurboDownloadEngine.getActiveUrls().
- *   No time threshold needed — the engine is the single source of truth.
+ *   its URL is NOT present in TurboDownloadEngine.getActiveUrls() nor
+ *   in HlsDownloader.getActiveUrls().
+ *   No time threshold needed — the engines are the single source of truth.
  */
 class DownloadProgressService : Service() {
 
@@ -164,7 +165,7 @@ class DownloadProgressService : Service() {
         //       Also: newly inserted DOWNLOADING records get a 1-cycle warm-up
         //       to prevent false positives on slow devices.
         //
-        val activeUrls = TurboDownloadEngine.getActiveUrls()
+        val activeUrls = TurboDownloadEngine.getActiveUrls() + HlsDownloader.getActiveUrls()
 
         val allRecords = try {
             db.downloadDao().getRecent(200)

@@ -48,8 +48,12 @@ object HlsDownloader {
             .build()
     }
 
-    // Track active jobs for cancellation
+    // Track active jobs for cancellation and stale-detection
     private val activeJobs = ConcurrentHashMap<String, Job>()
+
+    /** Returns the set of HLS URLs currently being downloaded.
+     *  Used by DownloadProgressService to avoid false-positive FAILED detection. */
+    fun getActiveUrls(): Set<String> = activeJobs.keys.toHashSet()
 
     // =========================================================================
     // Public API
@@ -101,7 +105,7 @@ object HlsDownloader {
 
         val scope = CoroutineScope(Dispatchers.IO + SupervisorJob() + handler)
         val job = scope.launch(block = block)
-
+        job.invokeOnCompletion { activeJobs.remove(url) }
         activeJobs[url] = job
         return job
     }
