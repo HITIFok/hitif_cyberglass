@@ -202,7 +202,7 @@ object SmartNaming {
                 val slug = segments.last()
                 val cleaned = slug
                     .replace(Regex("""^\d{2,}[\-–]"""), "") // strip leading "2703-"
-                    .replace(Regex("[_\-]+"), " ")
+                    .replace(Regex("[-_]+"), " ")
                     .trim()
                 return cleaned.takeIf { it.length >= 3 }
             }
