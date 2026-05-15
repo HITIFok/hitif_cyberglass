@@ -155,8 +155,8 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
                 return true
             }
             else -> try {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))); true
-            } catch (_: Exception) { true }
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))); return true
+            } catch (_: Exception) { return true }
         }
     }
 
