@@ -423,19 +423,17 @@ object DownloadHelper {
                 override fun onComplete(file: File) {
                     onDownloadEnded()
                     try {
-                            runBlocking {
-                                db.downloadDao().completeDownloadByUrl(
-                                    url = item.url, state = "COMPLETED",
-                                    ts = System.currentTimeMillis(), fileSize = file.length()
-                                )
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Failed to complete direct record: ${e.message}")
+                        runBlocking {
+                            db.downloadDao().completeDownloadByUrl(
+                                url = item.url, state = "COMPLETED",
+                                ts = System.currentTimeMillis(), fileSize = file.length()
+                            )
                         }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to complete direct record: ${e.message}")
+                    }
+                    try {
                         DownloadNotificationManager.showComplete(item.url, safeFilename, file.length())
-                        // Do NOT dismiss here — showComplete already sets autoCancel.
-                        // The previous dismiss() call was cancelling the completion
-                        // notification before the user could see it.
 
                         val ext = safeFilename.substringAfterLast('.', "mp4")
                         val mimeMap = mapOf(
