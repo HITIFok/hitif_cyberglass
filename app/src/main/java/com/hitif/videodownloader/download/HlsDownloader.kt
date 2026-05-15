@@ -29,6 +29,9 @@ import java.util.concurrent.atomic.AtomicLong
  * (DownloadHelper) can pre-fetch the m3u8 content via WebViewFetchHelper
  * and pass it using [downloadWithContent].
  */
+/** Thrown when HLS segment returns 403/401 — link auth token is permanently expired. */
+class LinkExpiredException(message: String) : Exception(message)
+
 object HlsDownloader {
 
     private const val TAG = "HlsDownloader"
@@ -313,12 +316,22 @@ object HlsDownloader {
 
                     httpClient.newCall(request).execute().use { resp ->
                         if (!resp.isSuccessful) {
-                            throw IllegalStateException("HTTP ${resp.code} for $url")
+                            val code = resp.code
+                            if (code in NON_RETRYABLE_CODES) {
+                                throw LinkExpiredException(
+                                    if (code == 403) "Lien expire (403). Rechargez la page et reessayez."
+                                    else "Erreur HTTP $code — acces refuse."
+                                )
+                            }
+                            throw IllegalStateException("HTTP $code for $url")
                         }
                         resp.body?.string()
                             ?: throw IllegalStateException("Empty body for $url")
                     }
                 } catch (e: CancellationException) {
+                    throw e
+                } catch (e: LinkExpiredException) {
+                    // Permanent failure — do NOT retry
                     throw e
                 } catch (e: Exception) {
                     lastError = e
@@ -411,8 +424,11 @@ object HlsDownloader {
     }
 
     // -----------------------------------------------------------------------
-    // Download segment — ALL exceptions retryable
+    // Download segment — 403/401 are non-retryable (expired auth token)
     // -----------------------------------------------------------------------
+
+    /** Non-retryable HTTP status codes (permanent failures, not transient). */
+    private val NON_RETRYABLE_CODES = setOf(401, 403, 410)
 
     private suspend fun downloadSegment(
         url: String,
@@ -441,7 +457,14 @@ object HlsDownloader {
 
                     httpClient.newCall(request).execute().use { response ->
                         if (!response.isSuccessful) {
-                            throw IllegalStateException("HTTP ${response.code} for segment $url")
+                            val code = response.code
+                            if (code in NON_RETRYABLE_CODES) {
+                                throw LinkExpiredException(
+                                    if (code == 403) "Lien expire (403 Forbidden). Rechargez la page et reessayez."
+                                    else "Erreur HTTP $code — acces refuse. Le lien est probablement expire."
+                                )
+                            }
+                            throw IllegalStateException("HTTP $code for segment $url")
                         }
                         val body = response.body
                             ?: throw IllegalStateException("Null body for segment: $url")
@@ -463,6 +486,10 @@ object HlsDownloader {
                     return@withContext
 
                 } catch (e: CancellationException) {
+                    throw e
+                } catch (e: LinkExpiredException) {
+                    // Permanent failure — do NOT retry
+                    Log.e(TAG, "Link expired, aborting immediately: ${url.take(60)} — ${e.message}")
                     throw e
                 } catch (e: Exception) {
                     retryCount++

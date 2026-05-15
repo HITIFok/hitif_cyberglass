@@ -453,8 +453,9 @@ object DownloadHelper {
     }
 
     private fun sanitizeFilename(name: String): String {
+        // Strip playlist extensions — SmartNaming already provides the correct
+        // output extension (mp4 for HLS/DASH, etc.) so we must NOT append .ts.
         return name.removeSuffix(".m3u8").removeSuffix(".mpd").removeSuffix(".m3u")
-            .let { if (it.endsWith(".ts")) it else "$it.ts" }
     }
 
     /** Throttles DB writes to at most once per second */
