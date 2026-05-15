@@ -17,6 +17,7 @@ import com.hitif.videodownloader.databinding.FragmentHistoryBinding
 import com.hitif.videodownloader.db.DownloadRecord
 import com.hitif.videodownloader.download.DownloadHelper
 import com.hitif.videodownloader.download.DownloadNotificationManager
+import com.hitif.videodownloader.download.DownloadProgressService
 import com.hitif.videodownloader.download.StorageMonitor
 import com.hitif.videodownloader.model.MediaItem
 import com.hitif.videodownloader.model.MediaType
@@ -112,9 +113,13 @@ class HistoryFragment : BottomSheetDialogFragment() {
     private fun setupButtons() {
         b.btnClose.setOnClickListener { dismiss() }
         b.btnClearAll.setOnClickListener {
-            // Cancel all active downloads
+            // 1. Stop the progress service FIRST so it cannot repost notifications
+            try { DownloadProgressService.stop(requireContext()) } catch (_: Exception) {}
+            // 2. Cancel all active download coroutines
             try { DownloadHelper.cancelAll() } catch (_: Exception) {}
+            // 3. Dismiss all download notifications
             try { DownloadNotificationManager.dismissAll() } catch (_: Exception) {}
+            // 4. Clear the database
             vm.clearHistory()
             Toast.makeText(requireContext(), "Historique effacé", Toast.LENGTH_SHORT).show()
         }

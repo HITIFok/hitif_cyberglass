@@ -11,6 +11,7 @@ import com.hitif.videodownloader.model.MediaItem
 import com.hitif.videodownloader.model.MediaType
 import com.hitif.videodownloader.network.MediaDetector
 import com.hitif.videodownloader.network.SmartNaming
+import com.hitif.videodownloader.download.DownloadNotificationManager
 import androidx.lifecycle.MutableLiveData
 import kotlinx.coroutines.launch
 
@@ -166,7 +167,17 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun clearFailedHistory() {
-        viewModelScope.launch { db.downloadDao().deleteFailedRecords() }
+        viewModelScope.launch {
+            // Dismiss error notifications for failed records before deleting them
+            try {
+                val failedRecords = db.downloadDao().getRecent(500)
+                    .filter { it.state == "FAILED" }
+                failedRecords.forEach { record ->
+                    DownloadNotificationManager.dismiss(record.url)
+                }
+            } catch (_: Exception) {}
+            db.downloadDao().deleteFailedRecords()
+        }
     }
 
     // ── Favorites operations ──────────────────────────────────────────────────
