@@ -31,8 +31,14 @@ object SmartNaming {
 
     // ── Quality / resolution detection ──────────────────────────────────────
 
+    /**
+     * Matches quality tags like 1080p, 720p, 480p, 360p, 4K, etc.
+     * IMPORTANT: the 'p' suffix is REQUIRED for numeric resolutions to avoid
+     * matching random numbers in CDN paths (e.g. /240/segment.ts).
+     * Bare HD/UHD are allowed as they are unambiguous.
+     */
     private val RE_QUALITY = Regex(
-        """(4K|2160p?|1080p?|720p?|480p?|360p?|240p?|HDR|HLG|SDR|HD|UHD)""",
+        """(4K|2160p|1080p|720p|480p|360p|240p|HDR|HLG|SDR|HD|UHD)""",
         RegexOption.IGNORE_CASE
     )
 
@@ -48,9 +54,10 @@ object SmartNaming {
         Regex("""[-–|·•]\s*(YouTube|Dailymotion|Vimeo|Netflix|Disney\+?|Prime\s*Video|TF1\+?|France\s*\d+|Arte|MyTF1|6play|Molotov|Pluto\s*TV).*$""", RegexOption.IGNORE_CASE),
         Regex("""\s*\|\s*.*$"""),                   // everything after " | "
         Regex("""\s*-\s*[^-]{0,30}$"""),            // trailing "- subtitle"
-        Regex("""\s*(HD|4K|Full\s*HD|VOSTFR|VF|VO|MKV|AVI|MP4)\s*$""", RegexOption.IGNORE_CASE),
+        Regex("""\s*(HD|4K|Full\s*HD|VOSTFR|VF|VO|STFR|MKV|AVI|MP4)\s*$""", RegexOption.IGNORE_CASE),
         Regex("""^\s*(Regarder|Watch|Voir|Lire)\s+""", RegexOption.IGNORE_CASE),
         Regex("""(Streaming|Gratuit|Free|Online)\s*$""", RegexOption.IGNORE_CASE),
+        Regex("""\s*Episode\s+\d+.*$""", RegexOption.IGNORE_CASE),  // trailing "Episode 9 VF ..."
     )
 
     // ────────────────────────────────────────────────────────────────────────
@@ -81,8 +88,10 @@ object SmartNaming {
         val seFromPage  = extractSE(item.pageUrl)
         val se          = seFromTitle ?: seFromUrl ?: seFromPage
 
-        // 2. Extract quality tag
-        val quality = RE_QUALITY.find(item.pageTitle + " " + item.url)
+        // 2. Extract quality tag from page title and page URL only.
+        //    Do NOT search the media URL (item.url) — CDN paths contain numbers
+        //    like /240/ or /360/ that are folder IDs, not quality indicators.
+        val quality = RE_QUALITY.find(item.pageTitle + " " + item.pageUrl)
             ?.value?.uppercase()
 
         // 3. Build base name
