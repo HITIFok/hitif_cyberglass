@@ -1,5 +1,6 @@
 package com.hitif.videodownloader.network
 
+import android.util.Log
 import android.webkit.WebResourceRequest
 import com.hitif.videodownloader.model.MediaItem
 import com.hitif.videodownloader.model.MediaType
@@ -9,15 +10,37 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Analyses intercepted WebView requests and sniffs media URLs.
- * Mirrors the logic of the HITIF Chrome extension's content script.
+ * Analyses intercepted WebView requests and response bodies, then sniffs
+ * media URLs. Mirrors the logic of the HITIF Chrome extension's content script.
+ *
+ * Detection sources:
+ *   1. shouldInterceptRequest — URL pattern matching + HEAD sniff
+ *   2. JS bridge onMedia() — URLs found by injected JavaScript
+ *   3. JS bridge onXhrResponse() — response bodies containing M3U8, video URLs
  */
 class MediaDetector(
     private val onMediaFound: (MediaItem) -> Unit
 ) {
+    companion object {
+        private const val TAG = "MediaDetector"
+
+        /** Regex patterns to extract video URLs from JSON/HTML response bodies */
+        private val VIDEO_URL_PATTERNS = listOf(
+            // JSON: common video URL keys
+            Regex(""""(?:url|src|file|playback_url|stream_url|video_url|download_url|source)\s*:\s*"(https?://[^"]+\.(?:m3u8|mpd|mp4|webm|mkv|ts)[^"]*)""""),
+            Regex(""""(?:url|src|file|playback_url|stream_url|video_url|download_url|source)\s*:\s*"(https?://[^"]*(?:/video/|/stream/|/media/|/hls/|/dash/)[^"]*)""""),
+            // Generic: quoted URLs with video extensions
+            Regex(""""(https?://[^"'\\s]+\.(?:m3u8|mpd)[^"'\\s]*)""""),
+            Regex(""""(https?://[^"'\\s]+\.(?:mp4|webm|mkv)(?:\?[^"'\\s]*)?)""""),
+            // Protocol-relative or bare URLs in source maps / configs
+            Regex("""(https?://[^\s"'<>]+\.(?:m3u8|mpd)(?:\?[^\s"'<>]*)?)"""),
+        )
+    }
+
     // Deduplicate by normalised URL
     private val seen = ConcurrentHashMap<String, Boolean>()
 
@@ -45,6 +68,12 @@ class MediaDetector(
     private val VIDEO_MIME_PREFIXES = listOf("video/", "application/x-mpegurl",
         "application/vnd.apple.mpegurl", "application/dash+xml")
     private val AUDIO_MIME_PREFIXES = listOf("audio/")
+
+    /** Extra MIME types that indicate media when URL also looks like media */
+    private val EXTRA_MEDIA_MIME = setOf(
+        "application/octet-stream", "binary/octet-stream",
+        "application/mp4", "video/mp2t", "video/MP2T"
+    )
 
     private val BLOCKED_HOSTS = setOf(
         "googlevideo.com", "googleads.g.doubleclick.net", "doubleclick.net",
@@ -118,6 +147,40 @@ class MediaDetector(
         }
     }
 
+    /**
+     * Analyse an XHR/fetch response body for media content.
+     * Called from JsInterface.onXhrResponse().
+     */
+    fun analyseResponse(url: String, content: String, pageUrl: String, pageTitle: String) {
+        if (content.length < 15) return
+        val lower = content.lowercase()
+
+        when {
+            // M3U8 / HLS content — emit the URL as a stream
+            lower.contains("#extinf") || lower.contains("#ext-x-stream-inf") -> {
+                // Extract direct segment/video URLs from M3U8 if it contains full URLs
+                extractVideoUrlsFromContent(url, content, pageUrl, pageTitle)
+                // Also emit the M3U8 URL itself as a downloadable stream
+                val key = url.substringBefore('?').substringBefore('#')
+                if (seen.putIfAbsent(key, true) == null) {
+                    emit(buildItem(url, "m3u8", MediaType.HLS, emptyMap(), -1L, pageUrl, pageTitle))
+                }
+            }
+            // DASH manifest
+            lower.contains("<mpd") || lower.contains("dash+xml") -> {
+                extractVideoUrlsFromContent(url, content, pageUrl, pageTitle)
+                val key = url.substringBefore('?').substringBefore('#')
+                if (seen.putIfAbsent(key, true) == null) {
+                    emit(buildItem(url, "mpd", MediaType.DASH, emptyMap(), -1L, pageUrl, pageTitle))
+                }
+            }
+            // JSON / HTML containing video URLs
+            else -> {
+                extractVideoUrlsFromContent(url, content, pageUrl, pageTitle)
+            }
+        }
+    }
+
     fun reset() {
         seen.clear()
         emittedStreamBases.clear()
@@ -145,11 +208,33 @@ class MediaDetector(
         hintType: MediaType, pageUrl: String, pageTitle: String
     ) {
         try {
+            // Build headers: forward all except Host/Content-Length/Connection
             val req = Request.Builder().url(url).method("HEAD", null).apply {
                 headers.forEach { (k, v) ->
-                    if (k.lowercase() !in listOf("host", "content-length")) addHeader(k, v)
+                    val kl = k.lowercase()
+                    if (kl !in listOf("host", "content-length", "connection")) {
+                        addHeader(k, v)
+                    }
                 }
-                header("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36")
+                // Forward cookies from the request context
+                try {
+                    val cookieManager = android.webkit.CookieManager.getInstance()
+                    val urlHost = try { URL(url).host ?: "" } catch (_: Exception) { "" }
+                    val pageHost = if (pageUrl.isNotBlank()) try { URL(pageUrl).host ?: "" } catch (_: Exception) { "" } else ""
+                    for (cookieUrl in listOfNotNull(
+                        pageUrl.takeIf { it.isNotBlank() },
+                        "https://$urlHost/".takeIf { urlHost.isNotBlank() && urlHost != pageHost }
+                    )) {
+                        val cookies = cookieManager.getCookie(cookieUrl)
+                        if (!cookies.isNullOrBlank()) {
+                            addHeader("Cookie", cookies)
+                            break
+                        }
+                    }
+                } catch (_: Exception) {}
+
+                header("User-Agent", "Mozilla/5.0 (Linux; Android 14; Pixel 8) " +
+                    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
             }.build()
 
             val resp = http.newCall(req).execute()
@@ -157,23 +242,57 @@ class MediaDetector(
             val size = resp.header("Content-Length", "-1")?.toLongOrNull() ?: -1L
             resp.close()
 
+            val mimeLower = mime.lowercase()
+
             val resolvedType = when {
-                VIDEO_MIME_PREFIXES.any { mime.startsWith(it) } -> {
-                    if (mime.contains("mpegurl") || mime.contains("dash")) MediaType.HLS
+                VIDEO_MIME_PREFIXES.any { mimeLower.startsWith(it) } -> {
+                    if (mimeLower.contains("mpegurl")) MediaType.HLS
+                    else if (mimeLower.contains("dash")) MediaType.DASH
                     else MediaType.VIDEO
                 }
-                AUDIO_MIME_PREFIXES.any { mime.startsWith(it) } -> MediaType.AUDIO
+                AUDIO_MIME_PREFIXES.any { mimeLower.startsWith(it) } -> MediaType.AUDIO
+                // application/octet-stream with a media-looking URL is likely video
+                mimeLower in EXTRA_MEDIA_MIME && looksLikeMedia(url) -> MediaType.VIDEO
                 hintType != MediaType.UNKNOWN -> hintType
                 else -> return   // not media
             }
 
             emit(buildItem(url, mime.substringAfter('/').substringBefore(';'),
                 resolvedType, headers, size, pageUrl, pageTitle))
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             // Network error — if hint says VIDEO/AUDIO, still emit
             if (hintType == MediaType.VIDEO || hintType == MediaType.AUDIO) {
                 emit(buildItem(url, "", hintType, headers, -1L, pageUrl, pageTitle))
             }
+        }
+    }
+
+    /**
+     * Extract video URLs from response body content (JSON, HTML, plain text)
+     * using regex patterns.
+     */
+    private fun extractVideoUrlsFromContent(
+        sourceUrl: String, content: String,
+        pageUrl: String, pageTitle: String
+    ) {
+        for (pattern in VIDEO_URL_PATTERNS) {
+            try {
+                pattern.findAll(content).forEach { match ->
+                    val extractedUrl = match.groupValues.getOrNull(1) ?: return@forEach
+                    if (extractedUrl.length > 15 && extractedUrl.startsWith("http")) {
+                        // Validate: URL must have a recognized media extension or path
+                        val lower = extractedUrl.lowercase()
+                        val isMedia = lower.contains(".m3u8") || lower.contains(".mpd") ||
+                                     lower.contains(".mp4") || lower.contains(".webm") ||
+                                     lower.contains(".mkv") || lower.contains(".ts") ||
+                                     lower.contains("/video/") || lower.contains("/stream/") ||
+                                     lower.contains("/media/") || lower.contains("/hls/")
+                        if (isMedia) {
+                            analyseUrl(extractedUrl, emptyMap(), pageUrl, pageTitle)
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
         }
     }
 
@@ -184,7 +303,7 @@ class MediaDetector(
     ): MediaItem {
         val quality = guessQuality(url, headers)
 
-        // For HLS/DASH streams: use page title as filename instead of raw m3u8/mpd name
+        // For HLS/DASH streams: use page title as filename
         val safeName = if (type == MediaType.HLS || type == MediaType.DASH) {
             val cleanTitle = pageTitle
                 .replace(Regex("[\\/:*?\"<>|]+"), " ")
@@ -193,14 +312,14 @@ class MediaDetector(
                 .trim('_', '-', ' ')
             if (cleanTitle.length >= 3) {
                 val qualitySuffix = when (quality) {
-                    com.hitif.videodownloader.model.MediaQuality.ULTRA -> "_4K"
-                    com.hitif.videodownloader.model.MediaQuality.HIGH -> "_1080p"
-                    com.hitif.videodownloader.model.MediaQuality.MEDIUM -> "_720p"
+                    MediaQuality.ULTRA -> "_4K"
+                    MediaQuality.HIGH -> "_1080p"
+                    MediaQuality.MEDIUM -> "_720p"
                     else -> ""
                 }
-                "${cleanTitle.take(80)}${qualitySuffix}.mp4"
+                "${cleanTitle.take(80)}${qualitySuffix}.ts"
             } else {
-                "hitif_${System.currentTimeMillis() / 1000}.mp4"
+                "hitif_${System.currentTimeMillis() / 1000}.ts"
             }
         } else {
             val rawName = url.substringBefore('?').substringAfterLast('/')

@@ -135,9 +135,50 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
     }
 
     private fun handleUrl(url: String): Boolean {
-        if (url.startsWith("http")) return false
-        return try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))); true }
-        catch (_: Exception) { true }
+        when {
+            url.startsWith("http://") || url.startsWith("https://") -> return false
+            url.startsWith("intent://") -> return handleIntentUrl(url)
+            url.startsWith("mailto:") -> {
+                try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) {}
+                return true
+            }
+            url.startsWith("tel:") -> {
+                try { startActivity(Intent(Intent.ACTION_DIAL, Uri.parse(url))) } catch (_: Exception) {}
+                return true
+            }
+            url.startsWith("market://") -> {
+                try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) {}
+                return true
+            }
+            url.startsWith("sms:") || url.startsWith("smsto:") -> {
+                try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } catch (_: Exception) {}
+                return true
+            }
+            else -> try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))); true
+            } catch (_: Exception) { true }
+        }
+    }
+
+    /** Handle intent:// URLs: extract browser_fallback_url for Facebook/Chrome intents */
+    private fun handleIntentUrl(url: String): Boolean {
+        try {
+            val intent = Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+            // Extract browser fallback URL (used by Facebook, Chrome, etc.)
+            val fallback = intent.getStringExtra("browser_fallback_url")
+            if (!fallback.isNullOrBlank() && (fallback.startsWith("http://") || fallback.startsWith("https://"))) {
+                binding.webView.loadUrl(fallback)
+                return true
+            }
+            // Try launching the intent without component restriction
+            intent.addCategory(Intent.CATEGORY_BROWSABLE)
+            intent.component = null
+            intent.selector = null
+            if (intent.resolveActivity(packageManager) != null) {
+                startActivity(intent)
+            }
+            return true
+        } catch (_: Exception) { return false }
     }
 
     // ── Address bar ──────────────────────────────────────────────────────────
