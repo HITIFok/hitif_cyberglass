@@ -42,14 +42,14 @@ object TurboDownloadEngine {
     private const val CHUNK_COUNT = 4
     private const val MULTI_CHUNK_THRESHOLD = 2L * 1024 * 1024   // 2 MB
     private const val SPEED_SAMPLE_INTERVAL_MS = 500L
-    private const val MAX_RESUME_ATTEMPTS = 5
-    private const val RESUME_BACKOFF_BASE_MS = 2_000L
+    private const val MAX_RESUME_ATTEMPTS = 8
+    private const val RESUME_BACKOFF_BASE_MS = 3_000L
 
     private val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(20, TimeUnit.SECONDS)
-            .readTimeout(90, TimeUnit.SECONDS)
-            .writeTimeout(90, TimeUnit.SECONDS)
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(180, TimeUnit.SECONDS)
+            .writeTimeout(120, TimeUnit.SECONDS)
             .connectionPool(okhttp3.ConnectionPool(8, 5, TimeUnit.MINUTES))
             .dns(FallbackDns())
             .retryOnConnectionFailure(true)
@@ -365,15 +365,20 @@ object TurboDownloadEngine {
      * retried by resuming the download (e.g. connection dropped mid-stream).
      */
     private fun isRetryableNetworkError(e: Throwable): Boolean {
-        val msg = e.message ?: return false
-        return msg.contains("unexpected end of stream", ignoreCase = true) ||
+        val msg = e.message ?: ""
+        return e is SocketException ||
+               e is java.net.SocketTimeoutException ||
+               e is java.net.ConnectException ||
+               e is javax.net.ssl.SSLException ||
+               msg.contains("unexpected end of stream", ignoreCase = true) ||
                msg.contains("connection reset", ignoreCase = true) ||
                msg.contains("broken pipe", ignoreCase = true) ||
                msg.contains("Connection closed prematurely", ignoreCase = true) ||
                msg.contains("stream closed", ignoreCase = true) ||
                msg.contains("Premature end of Content-Length", ignoreCase = true) ||
                msg.contains("closed", ignoreCase = true) ||
-               e is SocketException
+               msg.contains("timeout", ignoreCase = true) ||
+               msg.contains("timed out", ignoreCase = true)
     }
 
     // -----------------------------------------------------------------------

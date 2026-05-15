@@ -35,11 +35,12 @@ class DownloadProgressService : Service() {
 
     companion object {
         const val CHANNEL_ID       = "hitif_download_channel"
-        private const val GRACE_PERIOD_MS  = 15_000L
+        private const val GRACE_PERIOD_MS  = 20_000L
         private const val POLL_INTERVAL_MS = 2_000L
         /** Number of consecutive stale cycles before marking FAILED.
-         *  Set to 6 to survive process restart (START_STICKY ~5s restart delay). */
-        private const val STALE_THRESHOLD  = 6
+         *  Set to 10 (~20 s) to tolerate slow connections where a download
+         *  may briefly stall while the engine retries a timed-out chunk. */
+        private const val STALE_THRESHOLD  = 10
 
         @Volatile private var isRunning = false
 
@@ -187,8 +188,10 @@ class DownloadProgressService : Service() {
         //
         // Rule: a record is DOWNLOADING/QUEUED in the DB but the engine no
         //       longer has it → POTENTIALLY stale.
-        //       We wait 6 poll cycles (~9 s) before marking FAILED to give
-        //       the onComplete callback time to update the DB to COMPLETED.
+        //       We wait 10 poll cycles (~20 s) before marking FAILED to give
+        //       the onComplete callback time to update the DB to COMPLETED,
+        //       AND to tolerate slow connections where the engine is retrying
+        //       a timed-out chunk/segment.
         //       This fixes the race condition where onComplete fires an async
         //       DB update (scope.launch) but the engine removes the URL from
         //       activeJobs immediately in its finally block.

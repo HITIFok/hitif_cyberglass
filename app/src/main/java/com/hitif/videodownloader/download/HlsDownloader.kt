@@ -41,8 +41,8 @@ object HlsDownloader {
 
     private val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .connectTimeout(30, TimeUnit.SECONDS)
-            .readTimeout(60, TimeUnit.SECONDS)
+            .connectTimeout(45, TimeUnit.SECONDS)
+            .readTimeout(120, TimeUnit.SECONDS)
             .followRedirects(true)
             .connectionPool(okhttp3.ConnectionPool(8, 5, TimeUnit.MINUTES))
             .dns(FallbackDns())
@@ -438,7 +438,7 @@ object HlsDownloader {
     ) {
         withContext(Dispatchers.IO) {
             var retryCount = 0
-            val maxRetries = 5
+            val maxRetries = 8
 
             while (retryCount <= maxRetries) {
                 try {
@@ -498,10 +498,13 @@ object HlsDownloader {
                         throw e
                     }
                     val isDns = e is UnknownHostException || e.message?.contains("resolve host", ignoreCase = true) == true
-                    val backoff = if (isDns) {
-                        (3000L * retryCount).coerceAtMost(15000L)
-                    } else {
-                        (1000L * retryCount).coerceAtMost(5000L)
+                    val isTimeout = e is java.net.SocketTimeoutException ||
+                            e.message?.contains("timeout", ignoreCase = true) == true ||
+                            e.message?.contains("timed out", ignoreCase = true) == true
+                    val backoff = when {
+                        isDns -> (3000L * retryCount).coerceAtMost(15000L)
+                        isTimeout -> (3000L * retryCount).coerceAtMost(20000L)
+                        else -> (1500L * retryCount).coerceAtMost(10000L)
                     }
                     Log.w(TAG, "Segment retry $retryCount/$maxRetries [${e.javaClass.simpleName}]: ${url.take(60)} — wait ${backoff}ms")
                     delay(backoff)
