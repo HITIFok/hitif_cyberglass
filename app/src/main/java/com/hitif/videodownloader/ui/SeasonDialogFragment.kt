@@ -4,11 +4,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import android.widget.Toast
 import androidx.fragment.app.activityViewModels
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.hitif.videodownloader.R
 import com.hitif.videodownloader.databinding.FragmentSeasonBinding
 import com.hitif.videodownloader.download.DownloadHelper
@@ -63,7 +65,12 @@ class SeasonDialogFragment : BottomSheetDialogFragment() {
     }
 
     private fun setupList(episodes: List<SmartNaming.EpisodeCandidate>) {
-        epAdapter = SeasonAdapter(episodes)
+        epAdapter = SeasonAdapter(
+            episodes = episodes,
+            onRenameEpisode = { position, currentFilename ->
+                showEpisodeRenameDialog(position, currentFilename)
+            }
+        )
         b.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         b.recyclerView.adapter = epAdapter
     }
@@ -81,14 +88,54 @@ class SeasonDialogFragment : BottomSheetDialogFragment() {
                 return@setOnClickListener
             }
             val items = selected.map { it.item }
-            DownloadHelper.enqueueBatch(requireContext(), items)
+            val customFilenames = epAdapter.getCustomFilenames()
+            DownloadHelper.enqueueBatch(requireContext(), items, customFilenames)
             Toast.makeText(
                 requireContext(),
-                "⬇ ${selected.size} épisode(s) en téléchargement",
+                "\u2b07 ${selected.size} épisode(s) en téléchargement",
                 Toast.LENGTH_SHORT
             ).show()
             dismiss()
         }
+    }
+
+    /**
+     * Shows an inline rename dialog for a specific episode in the season list.
+     * Pre-fills the EditText with the current auto-generated (or custom) base name.
+     */
+    private fun showEpisodeRenameDialog(position: Int, currentFilename: String) {
+        val episodes = vm.seasonGroups.value?.get(seriesKey) ?: return
+        if (position !in episodes.indices) return
+
+        val ep = episodes[position]
+        val naming = SmartNaming.build(ep.item)
+
+        // Determine the current base name (without extension)
+        val currentBase = currentFilename.substringBeforeLast('.')
+
+        // Create an EditText for the dialog
+        val input = EditText(requireContext()).apply {
+            setText(currentBase)
+            setSelectAllOnFocus(true)
+            setSingleLine(true)
+            setTextSize(14f)
+            setPaddingRelative(48, 32, 48, 32)
+            setHint("Nom du fichier")
+            setTextColor(0xFFEAFAFF.toInt())
+            setHintTextColor(0xFF4A6878.toInt())
+        }
+
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Renommer ${ep.label}")
+            .setView(input)
+            .setPositiveButton("Confirmer") { _, _ ->
+                val newBase = input.text.toString().trim()
+                if (newBase.isNotBlank()) {
+                    epAdapter.setCustomName(position, newBase)
+                }
+            }
+            .setNegativeButton("Annuler", null)
+            .show()
     }
 
     override fun onDestroyView() { super.onDestroyView(); _b = null }

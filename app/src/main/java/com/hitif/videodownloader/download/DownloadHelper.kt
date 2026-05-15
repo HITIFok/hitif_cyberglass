@@ -138,11 +138,33 @@ object DownloadHelper {
     // Public API
     // =========================================================================
 
-    /** Single download — starts immediately (bypasses semaphore). */
-    fun enqueue(context: android.content.Context, item: MediaItem): Long {
+    /**
+     * Single download — starts immediately (bypasses semaphore).
+     *
+     * @param context  Application or activity context
+     * @param item     The media item to download
+     * @param customFilename  Optional custom base name (without extension).
+     *                        If null, SmartNaming auto-generates the name.
+     *                        The extension is always inferred from media type.
+     */
+    fun enqueue(
+        context: android.content.Context,
+        item: MediaItem,
+        customFilename: String? = null
+    ): Long {
         if (!initialized) init(context)
         val naming = SmartNaming.build(item)
-        return startDownload(context, item, naming, insertDb = true)
+        // If a custom filename is provided, override the auto-generated one
+        val effectiveNaming = if (customFilename != null) {
+            val ext = naming.extension
+            naming.copy(
+                filename = "$customFilename.$ext",
+                baseName = customFilename
+            )
+        } else {
+            naming
+        }
+        return startDownload(context, item, effectiveNaming, insertDb = true)
     }
 
     /**
@@ -150,10 +172,17 @@ object DownloadHelper {
      * Only MAX_CONCURRENT downloads run at a time; the rest wait in a queue.
      * All items appear immediately in history as QUEUED, then transition to
      * DOWNLOADING as slots become available.
+     *
+     * @param context  Application or activity context
+     * @param items    The media items to download
+     * @param customFilenames  Optional map of URL -> custom base name.
+     *                          If a URL is present in the map, its custom name
+     *                          is used; otherwise SmartNaming auto-generates.
      */
     fun enqueueBatch(
         context: android.content.Context,
-        items: List<MediaItem>
+        items: List<MediaItem>,
+        customFilenames: Map<String, String> = emptyMap()
     ): List<Pair<MediaItem, Long>> {
         if (!initialized) init(context)
         val db = AppDatabase.getInstance(context)
@@ -161,9 +190,19 @@ object DownloadHelper {
 
         for (item in items) {
             val naming = SmartNaming.build(item)
+            // Override with custom filename if provided
+            val effectiveNaming = if (customFilenames.containsKey(item.url)) {
+                val custom = customFilenames[item.url]!!
+                naming.copy(
+                    filename = "${custom}.${naming.extension}",
+                    baseName = custom
+                )
+            } else {
+                naming
+            }
             val safeFilename = when (item.mediaType) {
-                MediaType.HLS -> sanitizeFilename(naming.filename)
-                else          -> naming.filename
+                MediaType.HLS -> sanitizeFilename(effectiveNaming.filename)
+                else          -> effectiveNaming.filename
             }
 
             // Insert immediately as QUEUED so user sees all episodes in history
@@ -198,7 +237,7 @@ object DownloadHelper {
                         )
                     } catch (_: Exception) {}
 
-                    startDownload(context, item, naming, insertDb = false)
+                    startDownload(context, item, effectiveNaming, insertDb = false)
                 }
             }
 

@@ -151,12 +151,36 @@ class MediaPanelFragment : BottomSheetDialogFragment() {
                 Toast.makeText(requireContext(), check.message, Toast.LENGTH_LONG).show()
                 return
             }
-            DownloadHelper.enqueue(requireContext(), item)
-            Toast.makeText(requireContext(),
-                "⬇ ${item.filename.take(32)}", Toast.LENGTH_SHORT).show()
+            // Show rename dialog before downloading
+            showRenameDialog(item)
         } catch (e: Exception) {
             Toast.makeText(requireContext(), "Erreur : ${e.message}", Toast.LENGTH_LONG).show()
         }
+    }
+
+    /**
+     * Shows a rename dialog with the auto-generated filename pre-filled.
+     * The user can edit the name or just confirm to keep the suggestion.
+     */
+    private fun showRenameDialog(item: MediaItem) {
+        val renameDialog = RenameDialogFragment.newInstance(item)
+        renameDialog.onFilenameConfirmed = { baseName, _ ->
+            try {
+                DownloadHelper.enqueue(requireContext(), item, customFilename = baseName)
+                Toast.makeText(
+                    requireContext(),
+                    "\u2b07 ${baseName.take(32)}",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } catch (e: Exception) {
+                Toast.makeText(
+                    requireContext(),
+                    "Erreur : ${e.message}",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+        renameDialog.show(parentFragmentManager, "rename_dialog")
     }
 
     private fun share(item: MediaItem) {

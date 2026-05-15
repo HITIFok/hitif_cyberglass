@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="24dp"
+    android:background="@drawable/bg_bottom_sheet">
+
+    <!-- Title -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Renommer le fichier"
+        android:textColor="@color/accent_cyan"
+        android:textSize="16sp"
+        android:fontFamily="sans-serif-medium"
+        android:letterSpacing="0.06"
+        android:layout_marginBottom="18dp"/>
+
+    <!-- Info text -->
+    <TextView
+        android:id="@+id/tvInfo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Nom suggéré par SmartNaming"
+        android:textColor="@color/text_dim"
+        android:textSize="11sp"
+        android:layout_marginBottom="10dp"/>
+
+    <!-- Filename input row: editable name + fixed extension -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/bg_card_item"
+        android:padding="12dp">
+
+        <EditText
+            android:id="@+id/etFilename"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Nom du fichier"
+            android:textColor="@color/text_bright"
+            android:textColorHint="@color/text_dim"
+            android:textSize="14sp"
+            android:fontFamily="sans-serif"
+            android:inputType="text"
+            android:singleLine="true"
+            android:background="@android:color/transparent"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:textCursorDrawable="@null"/>
+
+        <TextView
+            android:id="@+id/tvExtension"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text=".mp4"
+            android:textColor="@color/accent_cyan_dim"
+            android:textSize="14sp"
+            android:fontFamily="sans-serif-medium"
+            android:paddingStart="6dp"/>
+    </LinearLayout>
+
+    <!-- Quality / type badge -->
+    <TextView
+        android:id="@+id/tvBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="HLS \u2022 MP4"
+        android:textColor="@color/text_dim"
+        android:textSize="10sp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="6dp"/>
+
+    <!-- Buttons -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="end"
+        android:layout_marginTop="18dp">
+
+        <android.widget.Button
+            android:id="@+id/btnCancel"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="ANNULER"
+            android:textColor="@color/text_dim"
+            android:textSize="11sp"
+            android:letterSpacing="0.06"
+            android:background="@drawable/bg_icon_btn"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"
+            android:layout_marginEnd="10dp"/>
+
+        <android.widget.Button
+            android:id="@+id/btnConfirm"
+            android:layout_width="wrap_content"
+            android:layout_height="40dp"
+            android:text="TÉLÉCHARGER"
+            android:textColor="@color/bg_primary"
+            android:textSize="11sp"
+            android:letterSpacing="0.06"
+            android:backgroundTint="@color/accent_cyan"
+            android:paddingStart="18dp"
+            android:paddingEnd="18dp"/>
+    </LinearLayout>
+
+</LinearLayout>
