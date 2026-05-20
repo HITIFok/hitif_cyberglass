@@ -30,6 +30,7 @@ import com.hitif.videodownloader.network.JsInterface
 import com.hitif.videodownloader.model.MediaItem
 import com.hitif.videodownloader.model.MediaType
 import com.hitif.videodownloader.download.YouTubeExtractor
+import com.hitif.videodownloader.network.YouTubeSpaJsBridge
 
 class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
 
@@ -104,6 +105,22 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
             "HitifFetchBridge"
         )
 
+        // [SPA] Register YouTube SPA navigation bridge
+        // Intercepts history.pushState/replaceState and popstate events
+        // so detectYouTubePage() fires on every YouTube video navigation,
+        // not just the initial page load.
+        wv.addJavascriptInterface(
+            YouTubeSpaJsBridge { url, title ->
+                runOnUiThread {
+                    // Clear stale YouTube items from media panel on SPA navigation
+                    vm.removeStaleYoutubeUrls()
+                    // Re-detect the new YouTube page
+                    detectYouTubePage(url, title)
+                }
+            },
+            "HITIFBridge"
+        )
+
         // Store WebView reference for fetch helper
         WebViewFetchHelper.webView = wv
 
@@ -131,6 +148,10 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
 
                 // Detect YouTube pages and create a MediaItem for InnerTube extraction
                 detectYouTubePage(url, title)
+
+                // [SPA] Inject pushState/replaceState/popstate interceptor for YouTube
+                // This catches in-app navigations that don't trigger onPageFinished()
+                injectYouTubeSpaScript(view)
 
                 // Start or stop YouTube refresh timer based on current URL
                 scheduleYoutubeRefresh(url)
@@ -287,6 +308,74 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
 
         // Emit through the same callback chain as MediaDetector
         vm.detector.emitDirect(item)
+    }
+
+    // ── YouTube SPA script injection ──────────────────────────────────
+    // Intercepts history.pushState(), replaceState(), and popstate events
+    // so YouTube video changes via SPA navigation are detected.
+    // Uses the "HITIFBridge" JavascriptInterface registered in setupWebView().
+
+    private fun injectYouTubeSpaScript(webView: WebView?) {
+        webView ?: return
+        val currentUrl = webView.url ?: return
+        // Only inject on YouTube pages
+        if (!currentUrl.contains("youtube.com") && !currentUrl.contains("youtu.be")) return
+
+        val script = """
+            (function() {
+                if (window.__HITIF_SPA_INJECTED__) return;
+                window.__HITIF_SPA_INJECTED__ = true;
+
+                // Intercept history.pushState (main YouTube SPA navigation)
+                var _pushState = history.pushState.bind(history);
+                history.pushState = function(state, title, url) {
+                    _pushState(state, title, url);
+                    if (url && typeof HITIFBridge !== 'undefined') {
+                        var fullUrl = url.startsWith('http') ? url : window.location.origin + url;
+                        HITIFBridge.onUrlChanged(fullUrl, document.title);
+                    }
+                };
+
+                // Intercept history.replaceState
+                var _replaceState = history.replaceState.bind(history);
+                history.replaceState = function(state, title, url) {
+                    _replaceState(state, title, url);
+                    if (url && typeof HITIFBridge !== 'undefined') {
+                        var fullUrl = url.startsWith('http') ? url : window.location.origin + url;
+                        HITIFBridge.onUrlChanged(fullUrl, document.title);
+                    }
+                };
+
+                // Listen for popstate (back/forward browser buttons)
+                window.addEventListener('popstate', function(e) {
+                    if (typeof HITIFBridge !== 'undefined') {
+                        HITIFBridge.onUrlChanged(window.location.href, document.title);
+                    }
+                });
+
+                // Watch <title> mutations (YouTube updates title after video loads)
+                var titleObserver = new MutationObserver(function(mutations) {
+                    mutations.forEach(function(mutation) {
+                        if (mutation.target === document.querySelector('title')) {
+                            if (typeof HITIFBridge !== 'undefined') {
+                                HITIFBridge.onTitleChanged(
+                                    window.location.href,
+                                    document.title
+                                );
+                            }
+                        }
+                    });
+                });
+                var titleEl = document.querySelector('title');
+                if (titleEl) {
+                    titleObserver.observe(titleEl, { subtree: true, characterData: true, childList: true });
+                }
+
+                console.log('[HITIF] SPA bridge injected on YouTube');
+            })();
+        """.trimIndent()
+
+        webView.evaluateJavascript(script, null)
     }
 
     // ── YouTube URL auto-refresh timer ───────────────────────────────────
