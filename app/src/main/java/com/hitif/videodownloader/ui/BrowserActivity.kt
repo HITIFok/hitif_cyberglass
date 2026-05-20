@@ -11,6 +11,9 @@ import android.os.Bundle
 import android.os.Environment
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import android.webkit.*
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -30,7 +33,16 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
     private lateinit var binding: ActivityBrowserBinding
     private val vm: BrowserViewModel by viewModels()
 
-    companion object { const val HOME_URL = "https://www.google.com" }
+    companion object {
+        const val HOME_URL = "https://www.google.com"
+        private const val TAG = "BrowserActivity"
+        /** YouTube URL auto-refresh interval (60 seconds) */
+        private const val YT_REFRESH_INTERVAL_MS = 60_000L
+    }
+
+    /** Handler for YouTube URL refresh timer */
+    private val ytRefreshHandler = Handler(Looper.getMainLooper())
+    private var ytRefreshRunnable: Runnable? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -111,6 +123,9 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
                 vm.updateMediaBase(url)
                 vm.updateCurrentTab(url, title)
                 view.evaluateJavascript(JsBridge.INJECT_SCRIPT, null)
+
+                // Start or stop YouTube refresh timer based on current URL
+                scheduleYoutubeRefresh(url)
             }
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
                 if (request.isForMainFrame) {
@@ -229,6 +244,62 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
             val title = vm.pageTitle.value ?: url
             vm.toggleFavorite(url, title)
         }
+    }
+
+    // ── YouTube URL auto-refresh timer ───────────────────────────────────
+    // YouTube signed URLs expire after ~6 hours. We refresh every 60s
+    // to prevent stale URLs. Inspired by VidMate's approach.
+
+    private fun scheduleYoutubeRefresh(url: String) {
+        // Stop any existing timer
+        stopYoutubeRefresh()
+
+        val isYoutube = url.contains("youtube.com") || url.contains("youtu.be")
+        if (!isYoutube) return
+
+        Log.d(TAG, "Starting YouTube URL refresh timer (60s interval)")
+        ytRefreshRunnable = object : Runnable {
+            override fun run() {
+                try {
+                    val wv = binding.webView
+                    if (wv.url?.contains("youtube.com") == true ||
+                        wv.url?.contains("youtu.be") == true) {
+                        // 1. Remove stale googlevideo.com URLs from dedup + media list
+                        wv.evaluateJavascript("""
+                            try {
+                                // Clear stale YouTube URLs from dedup in JS
+                                window.__hitif_seenItags = {};
+                            } catch(e) {}
+                            """.trimIndent(), null)
+
+                        // 2. Remove stale URLs from native side
+                        vm.removeStaleYoutubeUrls()
+
+                        // 3. Re-parse YouTube formats with forceRefresh
+                        wv.evaluateJavascript("""
+                            try {
+                                __hitif_refresh_youtube();
+                            } catch(e) {}
+                        """.trimIndent(), null)
+
+                        Log.d(TAG, "YouTube URL refresh completed")
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "YouTube refresh error: ${e.message}")
+                }
+                // Schedule next refresh
+                ytRefreshHandler.postDelayed(this, YT_REFRESH_INTERVAL_MS)
+            }
+        }
+        // Start after initial delay
+        ytRefreshHandler.postDelayed(ytRefreshRunnable!!, YT_REFRESH_INTERVAL_MS)
+    }
+
+    private fun stopYoutubeRefresh() {
+        ytRefreshRunnable?.let {
+            ytRefreshHandler.removeCallbacks(it)
+        }
+        ytRefreshRunnable = null
     }
 
     private fun openMediaPanel() {
@@ -417,6 +488,7 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
     }
 
     override fun onDestroy() {
+        stopYoutubeRefresh()
         WebViewFetchHelper.webView = null
         super.onDestroy()
     }

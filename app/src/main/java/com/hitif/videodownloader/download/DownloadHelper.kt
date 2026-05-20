@@ -21,6 +21,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import java.io.File
 import java.net.URL
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -244,6 +245,50 @@ object DownloadHelper {
             results.add(item to -1L)
         }
         return results
+    }
+
+    // -----------------------------------------------------------------------
+    // YouTube audio/video merge support
+    // -----------------------------------------------------------------------
+
+    /**
+     * Check if a MediaItem URL is a YouTube video-only (DASH adaptive) format.
+     * These must be downloaded separately and then merged with audio.
+     */
+    fun isYoutubeVideoOnly(item: MediaItem): Boolean {
+        return AudioVideoMerger.isYoutubeVideoOnly(item.url)
+    }
+
+    /**
+     * Find the best matching audio MediaItem for a YouTube video-only format.
+     * Looks through the current media list for an audio-only URL with the highest bitrate.
+     */
+    fun findAudioForVideo(videoItem: MediaItem, allMedia: List<MediaItem>): MediaItem? {
+        if (!AudioVideoMerger.isYoutubeVideoOnly(videoItem.url)) return null
+
+        // Prefer audio items detected from the same page
+        val audioItems = allMedia.filter {
+            it.mediaType == MediaType.AUDIO &&
+            it.url.contains("googlevideo.com") &&
+            AudioVideoMerger.isYoutubeAudioOnly(it.url)
+        }
+
+        if (audioItems.isEmpty()) return null
+
+        // Pick the highest bitrate audio (itag 251=128kbps > 250=64kbps > 249=48kbps > 140=128kbps)
+        return audioItems.maxByOrNull { audio ->
+            val itagMatch = Regex("[?&]itag=(\\d+)").find(audio.url)
+            val itag = itagMatch?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            when (itag) {
+                251 -> 128000  // Opus 128kbps
+                140 -> 127000  // AAC 128kbps
+                250 -> 64000   // Opus 64kbps
+                171 -> 128000  // AAC 128kbps
+                249 -> 48000   // Opus 48kbps
+                139 -> 48000   // AAC 48kbps
+                else -> 0
+            }
+        }
     }
 
     fun cancel(url: String) {
@@ -532,12 +577,27 @@ object DownloadHelper {
     }
 
     private fun buildHeaders(item: MediaItem): Map<String, String> = buildMap {
-        if (item.pageUrl.isNotBlank()) put("Referer", item.pageUrl)
+        // YouTube-specific: add Referer and sec-fetch headers to avoid 403
+        val isYoutube = item.url.contains("googlevideo.com")
+        if (isYoutube) {
+            if (item.pageUrl.isNotBlank()) put("Referer", item.pageUrl)
+            put("Origin", "https://www.youtube.com")
+            put("Sec-Fetch-Dest", "empty")
+            put("Sec-Fetch-Mode", "cors")
+            put("Sec-Fetch-Site", "cross-site")
+        } else {
+            if (item.pageUrl.isNotBlank()) put("Referer", item.pageUrl)
+        }
 
         try {
             val cookieManager = CookieManager.getInstance()
             val cookieUrls = mutableListOf<String>()
             if (item.pageUrl.isNotBlank()) cookieUrls.add(item.pageUrl)
+            // For YouTube, also get cookies from youtube.com domain
+            if (isYoutube) {
+                cookieUrls.add("https://www.youtube.com/")
+                cookieUrls.add("https://youtube.com/")
+            }
             try {
                 val mediaHost = URL(item.url).host ?: ""
                 if (mediaHost.isNotBlank() && item.url != item.pageUrl.substringBefore('/')) {

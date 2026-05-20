@@ -126,13 +126,35 @@ object TurboDownloadEngine {
         callback: TurboCallback
     ) = coroutineScope {
 
-        // ----- Step 0: storage pre-check (floor: 100 MB minimum) -----
+        // ----- Step 0: Check YouTube URL expiration -----
+        if (url.contains("googlevideo.com")) {
+            val expireParam = Regex("[?&]expire=(\\d+)").find(url)
+            if (expireParam != null) {
+                try {
+                    val expireEpoch = expireParam.groupValues[1].toLong()
+                    val nowEpoch = System.currentTimeMillis() / 1000
+                    val remaining = expireEpoch - nowEpoch
+                    if (remaining < 0) {
+                        throw IllegalStateException(
+                            "URL YouTube expiree (il y a ${-remaining}s). " +
+                            "Rafraichissez la page et reessayez."
+                        )
+                    }
+                    if (remaining < 60) {
+                        Log.w(TAG, "YouTube URL expires in ${remaining}s — download may fail")
+                    }
+                } catch (_: NumberFormatException) {}
+            }
+        }
+
+        // ----- Step 0b: storage pre-check (floor: 100 MB minimum) -----
         val preCheck = StorageMonitor.checkSpace(-1L)
         if (preCheck is StorageMonitor.SpaceResult.InsufficientSpace) {
             throw IllegalStateException(preCheck.message)
         }
 
-        // ----- Step 1: HEAD request for Content-Length -----
+        // ----- Step 1: HEAD request for Content-Length & Content-Type -----
+        var headContentType = ""
         val headRequest = Request.Builder()
             .url(url)
             .head()
@@ -142,19 +164,35 @@ object TurboDownloadEngine {
         val contentLength: Long = try {
             httpClient.newCall(headRequest).execute().use { resp ->
                 if (!resp.isSuccessful) -1L
-                else resp.body?.contentLength() ?: -1L
+                else {
+                    headContentType = resp.header("Content-Type", "") ?: ""
+                    resp.body?.contentLength() ?: -1L
+                }
             }
         } catch (e: UnknownHostException) {
             Log.w(TAG, "HEAD DNS failed, retrying: ${e.message}")
             delay(2_000)
             try {
                 httpClient.newCall(headRequest).execute().use { resp ->
-                    if (!resp.isSuccessful) -1L else resp.body?.contentLength() ?: -1L
+                    if (!resp.isSuccessful) -1L
+                    else {
+                        headContentType = resp.header("Content-Type", "") ?: ""
+                        resp.body?.contentLength() ?: -1L
+                    }
                 }
             } catch (_: Exception) { -1L }
         } catch (e: Exception) {
             Log.w(TAG, "HEAD failed, single-chunk fallback: ${e.message}")
             -1L
+        }
+
+        // ----- Content-Type validation: reject HTML/JSON responses -----
+        val ctLower = headContentType.lowercase()
+        if (ctLower.contains("text/html") || ctLower.contains("application/json")) {
+            throw IllegalStateException(
+                "Le serveur retourne du ${headContentType.substringBefore(';')} au lieu du video. " +
+                "URL probablement expiree ou invalide."
+            )
         }
 
         // FIX #3: Emit a zero-progress callback immediately after learning
@@ -571,5 +609,115 @@ object TurboDownloadEngine {
         files.forEach { file ->
             try { if (file.exists()) file.delete() } catch (_: Exception) {}
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Content-sniffing: validate that downloaded bytes are actual video/audio,
+    // not an HTML error page or JSON error response.
+    // Inspired by VidMate's content validation approach.
+    // -----------------------------------------------------------------------
+
+    /**
+     * Check the first bytes of a file to verify it's actual media content.
+     * Returns true if magic bytes match a known media format.
+     */
+    fun sniffFileContent(file: File): Boolean {
+        if (!file.exists() || file.length() < 12) return false
+        try {
+            file.inputStream().use { input ->
+                val header = ByteArray(16)
+                val read = input.read(header)
+                if (read < 4) return false
+
+                // MP4: ftyp box — offset 4-7 should be "ftyp"
+                if (read >= 8 && header[4] == 'f'.code.toByte() &&
+                    header[5] == 't'.code.toByte() &&
+                    header[6] == 'y'.code.toByte() &&
+                    header[7] == 'p'.code.toByte()) {
+                    return true
+                }
+
+                // WebM/Matroska: 0x1A 0x45 0xDF 0xA3
+                if (header[0] == 0x1A.toByte() && header[1] == 0x45.toByte() &&
+                    header[2] == 0xDF.toByte() && header[3] == 0xA3.toByte()) {
+                    return true
+                }
+
+                // FLV: 0x46 0x4C 0x56 ("FLV")
+                if (header[0] == 0x46.toByte() && header[1] == 0x4C.toByte() &&
+                    header[2] == 0x56.toByte()) {
+                    return true
+                }
+
+                // MPEG-TS: 0x47 (sync byte)
+                if (header[0] == 0x47.toByte()) {
+                    return true
+                }
+
+                // MP3: 0xFF 0xFB or 0xFF 0xF3 or 0xFF 0xF2 (MPEG audio frame sync)
+                if (header[0] == 0xFF.toByte() &&
+                    (header[1] and 0xE0.toByte()) == 0xE0.toByte()) {
+                    return true
+                }
+
+                // RIFF/AVI/WAV: "RIFF"...."AVI " or "WAVE"
+                if (read >= 12 && header[0] == 'R'.code.toByte() &&
+                    header[1] == 'I'.code.toByte() &&
+                    header[2] == 'F'.code.toByte() &&
+                    header[3] == 'F'.code.toByte()) {
+                    return true
+                }
+
+                // OGG: "OggS"
+                if (read >= 4 && header[0] == 'O'.code.toByte() &&
+                    header[1] == 'g'.code.toByte() &&
+                    header[2] == 'g'.code.toByte() &&
+                    header[3] == 'S'.code.toByte()) {
+                    return true
+                }
+
+                // Check for text content (HTML/JSON error pages)
+                val headerStr = String(header, 0, read.coerceAtMost(12), Charsets.US_ASCII)
+                val headerLower = headerStr.lowercase()
+                if (headerLower.startsWith("<!doctype") || headerLower.startsWith("<html") ||
+                    headerLower.startsWith("{\"") || headerLower.startsWith("{")) {
+                    Log.w(TAG, "Content-sniffing: file starts with text marker: $headerStr")
+                    return false
+                }
+
+                // If no known format detected but also not text, allow it
+                // (some formats don't have clear magic bytes)
+                return true
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Content-sniffing error: ${e.message}")
+            return true // Don't fail on sniff error
+        }
+    }
+
+    /**
+     * Validate a completed download: check file isn't suspiciously small
+     * and content matches expected format.
+     */
+    fun validateDownload(destPath: String, expectedSize: Long): Boolean {
+        val file = File(destPath)
+        if (!file.exists()) return false
+
+        val fileSize = file.length()
+
+        // If we know the expected size, check the file is at least 90% of it
+        if (expectedSize > 0) {
+            if (fileSize < expectedSize * 0.9) {
+                Log.w(TAG, "Validation: file too small ${fileSize}/${expectedSize} bytes")
+                return false
+            }
+        }
+
+        // For very small files (< 1KB), likely an error page
+        if (fileSize < 1024) {
+            return sniffFileContent(file)
+        }
+
+        return true
     }
 }

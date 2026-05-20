@@ -76,7 +76,8 @@ class MediaDetector(
     )
 
     private val BLOCKED_HOSTS = setOf(
-        "googlevideo.com", "googleads.g.doubleclick.net", "doubleclick.net",
+        // googlevideo.com is now ALLOWED — YouTube signed URLs come from this host
+        "googleads.g.doubleclick.net", "doubleclick.net",
         "ads.youtube.com", "static.ads-twitter.com"
     )
     private val SKIP_PATTERNS = listOf(
@@ -179,6 +180,28 @@ class MediaDetector(
                 extractVideoUrlsFromContent(url, content, pageUrl, pageTitle)
             }
         }
+    }
+
+    /**
+     * Emit a pre-built MediaItem directly (bypasses URL analysis).
+     * Used by JsInterface for YouTube format extraction where the item
+     * is already fully constructed with filename, quality, type, etc.
+     */
+    fun emitDirect(item: MediaItem) {
+        val key = item.url.substringBefore('?').substringBefore('#')
+        if (seen.putIfAbsent(key, true) != null) return
+        emit(item)
+    }
+
+    /**
+     * Remove all googlevideo.com URLs from the seen set.
+     * Called by the 60s YouTube refresh timer to clear stale signed URLs
+     * before re-parsing formats.
+     */
+    fun removeStaleYoutubeUrls() {
+        val keysToRemove = seen.keys.filter { it.contains("googlevideo.com") }
+        keysToRemove.forEach { seen.remove(it) }
+        Log.d(TAG, "Removed ${keysToRemove.size} stale YouTube URLs from dedup")
     }
 
     fun reset() {

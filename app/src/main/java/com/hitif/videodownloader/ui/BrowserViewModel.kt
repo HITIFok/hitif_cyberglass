@@ -146,6 +146,28 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
         recomputeSeasonGroups(emptyList())
     }
 
+    /**
+     * Remove stale YouTube (googlevideo.com) URLs from the media list.
+     * Called by the 60s refresh timer before re-parsing formats.
+     * This prevents expired URLs from accumulating in the UI.
+     */
+    fun removeStaleYoutubeUrls() {
+        synchronized(_seenUrls) {
+            // Remove from _seenUrls dedup set
+            _seenUrls.removeAll { it.contains("googlevideo.com") }
+
+            // Remove from media list (post new list without stale URLs)
+            val current = mediaItems.value.orEmpty()
+            val filtered = current.filter { !it.url.contains("googlevideo.com") }
+            if (filtered.size != current.size) {
+                mediaItems.postValue(filtered)
+                recomputeSeasonGroups(filtered)
+            }
+        }
+        // Also clear from detector's internal dedup
+        detector.removeStaleYoutubeUrls()
+    }
+
     fun removeItem(item: MediaItem) {
         val list = mediaItems.value.orEmpty().toMutableList()
         list.remove(item)
