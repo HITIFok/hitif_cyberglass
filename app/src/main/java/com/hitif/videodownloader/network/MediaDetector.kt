@@ -88,10 +88,11 @@ class MediaDetector(
      *  If they appear in the media panel, it means shouldInterceptRequest is picking them up.
      */
     private val BLOCKED_FILENAMES = setOf(
-        "success.mp3", "open.mp3", "no_input.mp3",
+        "success.mp3", "open.mp3", "no_input.mp3", "failure.mp3",
         "notification.mp3", "error.mp3", "click.mp3",
         "download_complete.mp3", "download_start.mp3",
-        "download_fail.mp3", "button_click.mp3"
+        "download_fail.mp3", "button_click.mp3",
+        "end.mp3", "start.mp3"
     )
 
     private val SKIP_PATTERNS = listOf(

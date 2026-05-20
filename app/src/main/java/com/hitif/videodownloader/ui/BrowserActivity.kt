@@ -305,6 +305,20 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
     }
 
     private fun openMediaPanel() {
+        // Force YouTube URL refresh BEFORE showing media panel
+        // This ensures fresh, non-expired URLs when user clicks download
+        val currentUrl = binding.webView.url ?: ""
+        if (currentUrl.contains("youtube.com") || currentUrl.contains("youtu.be")) {
+            Log.d(TAG, "Opening media panel — forcing YouTube URL refresh")
+            try {
+                binding.webView.evaluateJavascript("""
+                    try {
+                        __hitif_remove_stale_youtube();
+                        __hitif_refresh_youtube();
+                    } catch(e) { console.log('HITIF refresh error:', e); }
+                """.trimIndent(), null)
+            } catch (_: Exception) {}
+        }
         if (supportFragmentManager.findFragmentByTag("media_panel") != null) return
         MediaPanelFragment().show(supportFragmentManager, "media_panel")
     }

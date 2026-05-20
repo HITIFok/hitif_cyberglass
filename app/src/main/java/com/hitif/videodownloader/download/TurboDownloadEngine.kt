@@ -162,24 +162,23 @@ object TurboDownloadEngine {
         }
 
         // ----- Step 1: HEAD request for Content-Length & Content-Type -----
-        var headContentType = ""
-        val headRequest = Request.Builder()
-            .url(url)
-            .head()
-            .apply { headers.forEach { (k, v) -> addHeader(k, v) } }
-            .build()
+        // CRITICAL FIX: For YouTube googlevideo.com signed URLs, skip the HEAD
+        // request entirely. YouTube CDN servers often reject HEAD for signed URLs
+        // (return 403 or HTML instead of video). Go straight to GET download.
+        val isYoutubeSigned = url.contains("googlevideo.com")
 
-        val contentLength: Long = try {
-            httpClient.newCall(headRequest).execute().use { resp ->
-                if (!resp.isSuccessful) -1L
-                else {
-                    headContentType = resp.header("Content-Type", "") ?: ""
-                    resp.body?.contentLength() ?: -1L
-                }
-            }
-        } catch (e: UnknownHostException) {
-            Log.w(TAG, "HEAD DNS failed, retrying: ${e.message}")
-            delay(2_000)
+        var headContentType = ""
+        val contentLength: Long = if (isYoutubeSigned) {
+            // Skip HEAD for YouTube — go directly to single-chunk GET download
+            Log.d(TAG, "YouTube signed URL detected — skipping HEAD, using direct GET")
+            -1L
+        } else {
+            val headRequest = Request.Builder()
+                .url(url)
+                .head()
+                .apply { headers.forEach { (k, v) -> addHeader(k, v) } }
+                .build()
+
             try {
                 httpClient.newCall(headRequest).execute().use { resp ->
                     if (!resp.isSuccessful) -1L
@@ -188,23 +187,38 @@ object TurboDownloadEngine {
                         resp.body?.contentLength() ?: -1L
                     }
                 }
-            } catch (_: Exception) { -1L }
-        } catch (e: Exception) {
-            Log.w(TAG, "HEAD failed, single-chunk fallback: ${e.message}")
-            -1L
+            } catch (e: UnknownHostException) {
+                Log.w(TAG, "HEAD DNS failed, retrying: ${e.message}")
+                delay(2_000)
+                try {
+                    httpClient.newCall(headRequest).execute().use { resp ->
+                        if (!resp.isSuccessful) -1L
+                        else {
+                            headContentType = resp.header("Content-Type", "") ?: ""
+                            resp.body?.contentLength() ?: -1L
+                        }
+                    }
+                } catch (_: Exception) { -1L }
+            } catch (e: Exception) {
+                Log.w(TAG, "HEAD failed, single-chunk fallback: ${e.message}")
+                -1L
+            }
         }
 
         // ----- Content-Type validation: reject HTML/JSON responses -----
-        val ctLower = headContentType.lowercase()
-        if (ctLower.contains("text/html") || ctLower.contains("application/json")) {
-            val extraHint = if (url.contains("googlevideo.com")) {
-                "URL YouTube probablement expiree. Rechargez la page video et reessayez."
-            } else {
-                "URL probablement expiree ou invalide."
+        // Skip for YouTube signed URLs (HEAD was skipped)
+        if (!isYoutubeSigned) {
+            val ctLower = headContentType.lowercase()
+            if (ctLower.contains("text/html") || ctLower.contains("application/json")) {
+                val extraHint = if (url.contains("googlevideo.com")) {
+                    "URL YouTube probablement expiree. Rechargez la page video et reessayez."
+                } else {
+                    "URL probablement expiree ou invalide."
+                }
+                throw IllegalStateException(
+                    "Le serveur retourne du ${headContentType.substringBefore(';')} au lieu du video. $extraHint"
+                )
             }
-            throw IllegalStateException(
-                "Le serveur retourne du ${headContentType.substringBefore(';')} au lieu du video. $extraHint"
-            )
         }
 
         // FIX #3: Emit a zero-progress callback immediately after learning

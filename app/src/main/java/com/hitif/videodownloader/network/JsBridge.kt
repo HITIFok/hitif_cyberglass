@@ -52,7 +52,8 @@ object JsBridge {
       // Block internal asset filenames from being reported as media
       var fname = url.split('/').pop().split('?')[0].toLowerCase();
       if (fname === 'success.mp3' || fname === 'open.mp3' || fname === 'no_input.mp3' ||
-          fname === 'notification.mp3' || fname === 'error.mp3' || fname === 'click.mp3') return;
+          fname === 'failure.mp3' || fname === 'notification.mp3' || fname === 'error.mp3' ||
+          fname === 'click.mp3' || fname === 'end.mp3' || fname === 'start.mp3') return;
       // 3-arg call: report with title for YouTube formats
       if (title !== undefined) {
         bridge.onMedia(url, type || 'unknown', title || '');
@@ -365,9 +366,54 @@ object JsBridge {
     return '';
   };
 
+  // ── YouTube URL cache for fresh URL retrieval before download ──────
+  var __hitif_ytUrlCache = {}; // itag -> url mapping
+
   // ── YouTube URL refresh (called before opening media panel) ────────
   window.__hitif_refresh_youtube = function() {
+    // Clear cache on refresh
+    __hitif_ytUrlCache = {};
     return parseYouTubeFormats(true);
+  };
+
+  // ── Get fresh YouTube URL for a specific itag (called before download) ─
+  window.__hitif_get_fresh_youtube_url = function(itag) {
+    try {
+      // First check cache
+      if (__hitif_ytUrlCache && __hitif_ytUrlCache[itag]) {
+        return __hitif_ytUrlCache[itag];
+      }
+      // Re-parse from player response
+      var ytData = null;
+      try {
+        if (typeof ytInitialPlayerResponse !== 'undefined' && ytInitialPlayerResponse) {
+          ytData = ytInitialPlayerResponse;
+        }
+      } catch(e) {}
+      if (!ytData) {
+        try {
+          var ytcfg = document.querySelector('#ytcfg');
+          if (ytcfg && ytcfg.textContent) {
+            var cfg = JSON.parse(ytcfg.textContent);
+            if (cfg && cfg.args && cfg.args.player_response) {
+              ytData = JSON.parse(cfg.args.player_response);
+            }
+          }
+        } catch(e) {}
+      }
+      if (!ytData) return '';
+      var streamingData = ytData.streamingData;
+      if (!streamingData) return '';
+      var allFormats = (streamingData.formats || []).concat(streamingData.adaptiveFormats || []);
+      for (var i = 0; i < allFormats.length; i++) {
+        var fmt = allFormats[i];
+        if (fmt.itag === itag && fmt.url && fmt.url.length > 20) {
+          __hitif_ytUrlCache[itag] = fmt.url;
+          return fmt.url;
+        }
+      }
+    } catch(e) {}
+    return '';
   };
 
   // ── Remove stale googlevideo.com URLs from media panel ─────────────
