@@ -193,7 +193,7 @@ object AudioVideoMerger {
         // On API 29+, we can query the codec profile
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
-                val codecProfile = format.getInteger(MediaFormat.KEY_CODEC_PROFILE, -1)
+                format.getInteger("codec-profile", -1)
                 return when {
                     mime.contains("avc") || mime.contains("h264") -> "H.264"
                     mime.contains("hevc") || mime.contains("h265") || mime.contains("hvc1") -> "H.265"

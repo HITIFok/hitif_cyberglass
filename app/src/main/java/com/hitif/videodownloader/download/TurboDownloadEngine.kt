@@ -656,7 +656,7 @@ object TurboDownloadEngine {
 
                 // MP3: 0xFF 0xFB or 0xFF 0xF3 or 0xFF 0xF2 (MPEG audio frame sync)
                 if (header[0] == 0xFF.toByte() &&
-                    (header[1] and 0xE0.toByte()) == 0xE0.toByte()) {
+                    (header[1].toInt() and 0xE0) == 0xE0) {
                     return true
                 }
 
