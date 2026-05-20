@@ -269,9 +269,14 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
 
         Log.d(TAG, "YouTube page detected: videoId=$videoId title=$pageTitle")
 
+        // Sanitize title for use as filename
+        val safeName = (pageTitle?.take(80) ?: "YouTube_$videoId")
+            .replace(Regex("""[\\/:*?"<>|]+"""), "_")
+            .replace(Regex("""\s+"""), "_")
+
         val item = MediaItem(
             url = pageUrl,  // The page URL, NOT googlevideo
-            filename = "${pageTitle?.take(80)?.replace(Regex(\"[\\\\/:*?\\\"<>|]+\"), \"_\")?.replace(Regex(\"\\\\s+\"), \"_\") ?: \"YouTube_${videoId}\"}.mp4",
+            filename = "$safeName.mp4",
             mimeType = "video/mp4",
             mediaType = MediaType.VIDEO,
             quality = com.hitif.videodownloader.model.MediaQuality.UNKNOWN,
