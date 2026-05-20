@@ -38,6 +38,8 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
         private const val TAG = "BrowserActivity"
         /** YouTube URL auto-refresh interval (60 seconds) */
         private const val YT_REFRESH_INTERVAL_MS = 60_000L
+        /** Delay before first YouTube format parse after page load (ms) */
+        private const val YT_INITIAL_PARSE_DELAY_MS = 3_500L
     }
 
     /** Handler for YouTube URL refresh timer */
@@ -291,8 +293,8 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
                 ytRefreshHandler.postDelayed(this, YT_REFRESH_INTERVAL_MS)
             }
         }
-        // Start after initial delay
-        ytRefreshHandler.postDelayed(ytRefreshRunnable!!, YT_REFRESH_INTERVAL_MS)
+        // Start after initial delay (3.5s — gives time for player to fully load)
+        ytRefreshHandler.postDelayed(ytRefreshRunnable!!, YT_INITIAL_PARSE_DELAY_MS)
     }
 
     private fun stopYoutubeRefresh() {

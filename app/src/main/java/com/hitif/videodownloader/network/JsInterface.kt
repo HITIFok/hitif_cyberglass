@@ -25,6 +25,14 @@ class JsInterface(
 ) {
     companion object { const val TAG = "JsInterface" }
 
+    /** Internal asset filenames that must NEVER be reported as media. */
+    private val BLOCKED_ASSET_NAMES = setOf(
+        "success.mp3", "open.mp3", "no_input.mp3",
+        "notification.mp3", "error.mp3", "click.mp3",
+        "download_complete.mp3", "download_start.mp3",
+        "download_fail.mp3", "button_click.mp3"
+    )
+
     /**
      * Receives a media URL from JavaScript.
      *
@@ -36,10 +44,34 @@ class JsInterface(
     fun onMedia(url: String, type: String, title: String?) {
         if (url.isBlank() || url.length < 10) return
 
+        // ── Block internal app assets and non-http URLs ──────────────────
+        val urlLower = url.lowercase()
+        // Block local file, content, asset, data, blob URLs
+        if (urlLower.startsWith("file://") || urlLower.startsWith("content://") ||
+            urlLower.startsWith("android_asset") || urlLower.startsWith("data:") ||
+            urlLower.startsWith("blob:") || urlLower.startsWith("javascript:")) {
+            return
+        }
+        // Block known internal app asset filenames
+        val filename = url.substringAfterLast('/').substringBefore('?').lowercase()
+        if (filename in BLOCKED_ASSET_NAMES) {
+            Log.d(TAG, "onMedia: blocked internal asset: $filename")
+            return
+        }
+        // Block any URL containing /android_asset/
+        if (url.contains("/android_asset/")) return
+
         val effectiveTitle = title ?: pageTitle.value ?: ""
 
         // YouTube format: type starts with "youtube_" and contains quality info
         if (type.startsWith("youtube_")) {
+            // Validate: YouTube format URLs MUST come from googlevideo.com
+            // This prevents false positives where internal audio files are
+            // incorrectly tagged as YouTube formats by the JS bridge
+            if (!url.contains("googlevideo.com")) {
+                Log.d(TAG, "onMedia: skipping non-googlevideo YouTube URL: ${url.take(80)}")
+                return
+            }
             val detail = type.removePrefix("youtube_")
             val isVideoOnly = detail.contains("[video-only]")
             val isAudioOnly = detail.contains("[audio-only]")

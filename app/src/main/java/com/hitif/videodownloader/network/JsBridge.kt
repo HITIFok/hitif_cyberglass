@@ -44,6 +44,15 @@ object JsBridge {
   function report(url, type, title) {
     try {
       if (!url || url.length < 8) return;
+      // Block non-http URLs (file://, blob:, data:, etc.)
+      var urlLower = url.toLowerCase();
+      if (urlLower.indexOf('file://') === 0 || urlLower.indexOf('content://') === 0 ||
+          urlLower.indexOf('blob:') === 0 || urlLower.indexOf('data:') === 0 ||
+          urlLower.indexOf('javascript:') === 0) return;
+      // Block internal asset filenames from being reported as media
+      var fname = url.split('/').pop().split('?')[0].toLowerCase();
+      if (fname === 'success.mp3' || fname === 'open.mp3' || fname === 'no_input.mp3' ||
+          fname === 'notification.mp3' || fname === 'error.mp3' || fname === 'click.mp3') return;
       // 3-arg call: report with title for YouTube formats
       if (title !== undefined) {
         bridge.onMedia(url, type || 'unknown', title || '');
@@ -336,12 +345,20 @@ object JsBridge {
         }
       }
 
-      // Method 3: <title> tag (fallback)
+      // Method 3: <h1> tag inside #title/ytd-watch-metadata (modern YouTube UI)
+      var h1El = document.querySelector('h1.ytd-watch-metadata yt-formatted-string, h1.ytd-video-primary-info-renderer yt-formatted-string, #info-contents h1');
+      if (h1El && h1El.textContent && h1El.textContent.trim().length > 2) {
+        return h1El.textContent.trim();
+      }
+
+      // Method 4: <title> tag (fallback)
       var titleEl = document.querySelector('title');
       if (titleEl && titleEl.textContent) {
         var t = titleEl.textContent;
         // Strip " - YouTube" suffix
         t = t.replace(/\s*-\s*YouTube\s*$/i, '').trim();
+        // Also strip "(123)" view count suffix
+        t = t.replace(/\s*\(\d+\s*views?\)\s*$/i, '').trim();
         return t;
       }
     } catch(e) {}

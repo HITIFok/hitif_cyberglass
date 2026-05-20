@@ -137,13 +137,21 @@ object TurboDownloadEngine {
                     if (remaining < 0) {
                         throw IllegalStateException(
                             "URL YouTube expiree (il y a ${-remaining}s). " +
-                            "Rafraichissez la page et reessayez."
+                            "Fermez et rouvrez la video, puis reessayez."
                         )
                     }
-                    if (remaining < 60) {
-                        Log.w(TAG, "YouTube URL expires in ${remaining}s — download may fail")
+                    if (remaining < 120) {
+                        Log.w(TAG, "YouTube URL expires in ${remaining}s — " +
+                            "download may fail. Consider refreshing the page first.")
                     }
                 } catch (_: NumberFormatException) {}
+            }
+
+            // For YouTube URLs, ensure we don't have a filename like "videoplayback"
+            // — use the URL's "itag" parameter to verify it's a real stream
+            val itagParam = Regex("[?&]itag=(\\d+)").find(url)
+            if (itagParam == null) {
+                Log.w(TAG, "YouTube URL missing itag parameter — may not be a valid stream")
             }
         }
 
@@ -189,9 +197,13 @@ object TurboDownloadEngine {
         // ----- Content-Type validation: reject HTML/JSON responses -----
         val ctLower = headContentType.lowercase()
         if (ctLower.contains("text/html") || ctLower.contains("application/json")) {
-            throw IllegalStateException(
-                "Le serveur retourne du ${headContentType.substringBefore(';')} au lieu du video. " +
+            val extraHint = if (url.contains("googlevideo.com")) {
+                "URL YouTube probablement expiree. Rechargez la page video et reessayez."
+            } else {
                 "URL probablement expiree ou invalide."
+            }
+            throw IllegalStateException(
+                "Le serveur retourne du ${headContentType.substringBefore(';')} au lieu du video. $extraHint"
             )
         }
 
@@ -715,6 +727,13 @@ object TurboDownloadEngine {
 
         // For very small files (< 1KB), likely an error page
         if (fileSize < 1024) {
+            return sniffFileContent(file)
+        }
+
+        // YouTube-specific: files smaller than 10KB from googlevideo.com are
+        // almost certainly expired URL error responses, not real video
+        if (destPath.contains("googlevideo") && fileSize < 10_240) {
+            Log.w(TAG, "YouTube download suspiciously small (${fileSize}B) — likely expired URL")
             return sniffFileContent(file)
         }
 

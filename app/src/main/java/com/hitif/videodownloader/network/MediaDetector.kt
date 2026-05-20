@@ -69,9 +69,12 @@ class MediaDetector(
         "application/vnd.apple.mpegurl", "application/dash+xml")
     private val AUDIO_MIME_PREFIXES = listOf("audio/")
 
-    /** Extra MIME types that indicate media when URL also looks like media */
+    /** Extra MIME types that indicate media when URL also looks like media.
+     *  NOTE: "application/octet-stream" is removed here because many non-media
+     *  resources (CSS, JS bundles, JSON configs) use this MIME type, causing
+     *  false positives on YouTube and other sites.
+     */
     private val EXTRA_MEDIA_MIME = setOf(
-        "application/octet-stream", "binary/octet-stream",
         "application/mp4", "video/mp2t", "video/MP2T"
     )
 
@@ -80,6 +83,17 @@ class MediaDetector(
         "googleads.g.doubleclick.net", "doubleclick.net",
         "ads.youtube.com", "static.ads-twitter.com"
     )
+    /** Filenames that are known internal app assets and must NEVER be detected as media.
+     *  These are bundled inside the APK (assets/raw folder) and loaded by the WebView.
+     *  If they appear in the media panel, it means shouldInterceptRequest is picking them up.
+     */
+    private val BLOCKED_FILENAMES = setOf(
+        "success.mp3", "open.mp3", "no_input.mp3",
+        "notification.mp3", "error.mp3", "click.mp3",
+        "download_complete.mp3", "download_start.mp3",
+        "download_fail.mp3", "button_click.mp3"
+    )
+
     private val SKIP_PATTERNS = listOf(
         Regex("manifest\\.json$"), Regex("thumbnail"), Regex("poster"),
         Regex("preview"), Regex("storyboard"), Regex("/ad/"), Regex("/ads/"),
@@ -95,7 +109,25 @@ class MediaDetector(
         // HLS variant playlists — master.m3u8 is enough, skip index-v*-a*.m3u8
         Regex("/index-v\\d+-a\\d+\\.m3u8$"),
         Regex("/index_v\\d+_a\\d+\\.m3u8$"),
-        Regex("playlist-?\\d+\\.m3u8$", RegexOption.IGNORE_CASE)
+        Regex("playlist-?\\d+\\.m3u8$", RegexOption.IGNORE_CASE),
+        // ── YouTube non-media resources ─────────────────────────────────
+        Regex("youtube\\.com/(favicon|s/generate_)"),
+        Regex("youtube\\.com/(yts/img|logo)"),
+        Regex("youtube\\.com/embed/"),
+        Regex("\\.ggpht\\.com/"),
+        Regex("yt3\\.ggpht\\.com/"),
+        Regex("ytimg\\.com/"),
+        Regex("i\\.ytimg\\.com/"),
+        Regex("yt\\.be/"),
+        // ── Internal app / local asset URLs ─────────────────────────────
+        Regex("^file:///"),
+        Regex("^content://"),
+        Regex("^android_asset"),
+        Regex("^data:"),
+        Regex("^blob:"),
+        Regex("/android_asset/"),
+        Regex("^javascript:"),
+        Regex("about:blank")
     )
 
     // Track which HLS/DASH base URLs we've already emitted (deduplicate per stream)
@@ -186,8 +218,34 @@ class MediaDetector(
      * Emit a pre-built MediaItem directly (bypasses URL analysis).
      * Used by JsInterface for YouTube format extraction where the item
      * is already fully constructed with filename, quality, type, etc.
+     *
+     * Validates that YouTube items have a googlevideo.com URL to prevent
+     * internal app files from being emitted as YouTube media.
      */
     fun emitDirect(item: MediaItem) {
+        // YouTube items MUST come from googlevideo.com
+        if (item.url.contains("youtube") || item.mimeType.contains("youtube") ||
+            item.filename.contains("youtube")) {
+            if (!item.url.contains("googlevideo.com")) {
+                Log.d(TAG, "emitDirect: skipping non-googlevideo URL with YouTube label: ${item.url.take(80)}")
+                return
+            }
+        }
+
+        // Block known internal asset filenames regardless of source
+        val filename = item.url.substringAfterLast('/').substringBefore('?').lowercase()
+        if (filename in BLOCKED_FILENAMES) {
+            Log.d(TAG, "emitDirect: skipping blocked internal asset: $filename")
+            return
+        }
+
+        // Block non-http URLs (file://, content://, data:, blob:)
+        val cleanUrl = item.url.lowercase().trim()
+        if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+            Log.d(TAG, "emitDirect: skipping non-http URL: ${item.url.take(80)}")
+            return
+        }
+
         val key = item.url.substringBefore('?').substringBefore('#')
         if (seen.putIfAbsent(key, true) != null) return
         emit(item)
@@ -212,6 +270,21 @@ class MediaDetector(
     // ── Internal helpers ─────────────────────────────────────────────────────
 
     private fun shouldSkip(cleanUrl: String): Boolean {
+        // Block known internal app asset filenames
+        val filename = cleanUrl.substringAfterLast('/').substringBefore('?').lowercase()
+        if (filename in BLOCKED_FILENAMES) {
+            Log.d(TAG, "Skipping blocked internal asset: $filename")
+            return true
+        }
+
+        // Block any URL that is a local file, asset, data URI, or blob
+        if (cleanUrl.startsWith("file://") || cleanUrl.startsWith("content://") ||
+            cleanUrl.startsWith("android_asset") || cleanUrl.startsWith("data:") ||
+            cleanUrl.startsWith("blob:") || cleanUrl.startsWith("javascript:") ||
+            cleanUrl.contains("/android_asset/")) {
+            return true
+        }
+
         BLOCKED_HOSTS.forEach { host -> if (cleanUrl.contains(host)) return true }
         SKIP_PATTERNS.forEach { re -> if (re.containsMatchIn(cleanUrl)) return true }
         return false
