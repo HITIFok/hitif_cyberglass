@@ -14,3 +14,7 @@ local.properties
 *.aab
 *.log
 /app/keystore/
+.env
+/download/
+/upload/
+/Telecharge_Video_261/
