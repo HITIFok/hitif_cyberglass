@@ -5,10 +5,10 @@
     android:viewportHeight="24">
     <!-- Browser tab icon -->
     <path
-        android:fillColor="#00E5FF"
+        android:fillColor="#F2A65A"
         android:pathData="M3,5 L11,5 L13,3 L21,3 C21.55,3 22,3.45 22,4 L22,19 C22,19.55 21.55,20 21,20 L3,20 C2.45,20 2,19.55 2,19 L2,6 C2,5.45 2.45,5 3,5 Z"/>
     <path
-        android:fillColor="#00E5FF"
+        android:fillColor="#F2A65A"
         android:fillAlpha="0.3"
         android:pathData="M3,7 L21,7 L21,19 C21,19.55 20.55,20 20,20 L4,20 C3.45,20 3,19.55 3,19 Z"/>
 </vector>

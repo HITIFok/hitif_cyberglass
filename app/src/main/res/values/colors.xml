@@ -1,47 +1,47 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- ── Background (glass-dark) ──────────────────────────────────── -->
-    <color name="bg_primary">#0A0E1A</color>
-    <color name="bg_surface">#CC0C1426</color>
-    <color name="bg_card">#B3091222</color>
-    <color name="bg_elevated">#CC0F1E34</color>
-    <color name="bg_toolbar">#E6070F1E</color>
+    <!-- Backgrounds: warm smoked glass -->
+    <color name="bg_primary">#0D0907</color>
+    <color name="bg_surface">#CC1B120E</color>
+    <color name="bg_card">#B3241812</color>
+    <color name="bg_elevated">#CC2A1B14</color>
+    <color name="bg_toolbar">#E6170F0B</color>
 
-    <!-- ── Accents ───────────────────────────────────────────────────── -->
-    <color name="accent_cyan">#00F5FF</color>
-    <color name="accent_cyan_dim">#0099BB</color>
-    <color name="accent_magenta">#FF44FF</color>
-    <color name="accent_magenta_dim">#BB00BB</color>
-    <color name="accent_violet">#BB99FF</color>
+    <!-- Copper / amber accents -->
+    <color name="accent_cyan">#F2A65A</color>
+    <color name="accent_cyan_dim">#C87A32</color>
+    <color name="accent_magenta">#FFB07A</color>
+    <color name="accent_magenta_dim">#C97B52</color>
+    <color name="accent_violet">#E0B38A</color>
 
-    <!-- ── Text ──────────────────────────────────────────────────────── -->
-    <color name="text_primary">#D8EAF8</color>
-    <color name="text_dim">#4A6878</color>
-    <color name="text_bright">#EAFAFF</color>
+    <!-- Text -->
+    <color name="text_primary">#E6D1BF</color>
+    <color name="text_dim">#9E7C67</color>
+    <color name="text_bright">#FFF1E2</color>
 
-    <!-- ── Glass borders (neon glow) ────────────────────────────────── -->
-    <color name="border_cyan">#3300F5FF</color>
-    <color name="border_cyan_hi">#6600F5FF</color>
-    <color name="border_cyan_glow">#9900F5FF</color>
-    <color name="border_magenta">#33FF44FF</color>
-    <color name="border_magenta_glow">#66FF44FF</color>
+    <!-- Borders / glow -->
+    <color name="border_cyan">#33F2A65A</color>
+    <color name="border_cyan_hi">#66F2A65A</color>
+    <color name="border_cyan_glow">#99F2A65A</color>
+    <color name="border_magenta">#33FFB07A</color>
+    <color name="border_magenta_glow">#66FFB07A</color>
 
-    <!-- ── Glass sheen layers ───────────────────────────────────────── -->
-    <color name="glass_sheen_top">#18FFFFFF</color>
-    <color name="glass_sheen_bot">#00FFFFFF</color>
-    <color name="glass_inner">#0800F5FF</color>
+    <!-- Glass sheen -->
+    <color name="glass_sheen_top">#18FFF6EE</color>
+    <color name="glass_sheen_bot">#00FFF6EE</color>
+    <color name="glass_inner">#12F2A65A</color>
 
-    <!-- ── Status ────────────────────────────────────────────────────── -->
-    <color name="status_success">#00F599</color>
-    <color name="status_error">#FF4455</color>
-    <color name="status_warning">#FFBB00</color>
+    <!-- Status -->
+    <color name="status_success">#9FD7A4</color>
+    <color name="status_error">#F06B64</color>
+    <color name="status_warning">#F2A65A</color>
 
     <!-- Material required -->
-    <color name="purple_200">#00F5FF</color>
-    <color name="purple_500">#00BBDD</color>
-    <color name="purple_700">#008899</color>
-    <color name="teal_200">#FF44FF</color>
-    <color name="teal_700">#BB00BB</color>
-    <color name="black">#0A0E1A</color>
-    <color name="white">#D8EAF8</color>
+    <color name="purple_200">#F2A65A</color>
+    <color name="purple_500">#C87A32</color>
+    <color name="purple_700">#8D5625</color>
+    <color name="teal_200">#FFB07A</color>
+    <color name="teal_700">#C97B52</color>
+    <color name="black">#0D0907</color>
+    <color name="white">#FFF1E2</color>
 </resources>

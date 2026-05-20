@@ -3,13 +3,13 @@
     android:viewportWidth="24" android:viewportHeight="24">
     <!-- Pencil icon for rename/edit -->
     <path android:fillColor="#00000000"
-          android:strokeColor="#506070"
+          android:strokeColor="#9E7C67"
           android:strokeWidth="1.8"
           android:strokeLineCap="round"
           android:strokeLineJoin="round"
           android:pathData="M11,4H4a2,2 0 0,0 -2,2v14a2,2 0 0,0 2,2h14a2,2 0 0,0 2,-2v-7"/>
     <path android:fillColor="#00000000"
-          android:strokeColor="#506070"
+          android:strokeColor="#9E7C67"
           android:strokeWidth="1.8"
           android:strokeLineCap="round"
           android:strokeLineJoin="round"

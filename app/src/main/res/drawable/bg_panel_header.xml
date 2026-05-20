@@ -2,23 +2,17 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <gradient android:type="linear" android:angle="270"
-                android:startColor="#EE0D1E38" android:endColor="#EE091526"/>
+            <gradient android:angle="270" android:startColor="#F02B1B14" android:endColor="#E0160E0A"/>
         </shape>
     </item>
-    <!-- Bottom border line -->
     <item android:gravity="bottom" android:height="1.5dp">
         <shape android:shape="rectangle">
-            <gradient android:type="linear" android:angle="0"
-                android:startColor="#0000F5FF" android:centerColor="#5500F5FF"
-                android:endColor="#0000F5FF"/>
+            <gradient android:angle="0" android:startColor="#00F2A65A" android:centerColor="@color/border_cyan_hi" android:endColor="#00F2A65A"/>
         </shape>
     </item>
-    <!-- Subtle sheen -->
     <item android:gravity="top" android:height="40dp">
         <shape android:shape="rectangle">
-            <gradient android:type="linear" android:angle="270"
-                android:startColor="#0EFFFFFF" android:endColor="#00FFFFFF"/>
+            <gradient android:angle="270" android:startColor="#10FFF6EE" android:endColor="#00FFF6EE"/>
         </shape>
     </item>
 </layer-list>

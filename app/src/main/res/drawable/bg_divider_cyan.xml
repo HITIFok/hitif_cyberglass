@@ -1,19 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Glow halo -->
     <item>
         <shape android:shape="rectangle">
-            <gradient android:type="linear" android:angle="0"
-                android:startColor="#0000F5FF" android:centerColor="#2200F5FF"
-                android:endColor="#0000F5FF"/>
+            <gradient android:angle="0" android:startColor="#00F2A65A" android:centerColor="@color/border_cyan" android:endColor="#00F2A65A"/>
         </shape>
     </item>
-    <!-- Core line -->
     <item>
         <shape android:shape="rectangle">
-            <gradient android:type="linear" android:angle="0"
-                android:startColor="#0000F5FF" android:centerColor="#6600F5FF"
-                android:endColor="#0000F5FF"/>
+            <gradient android:angle="0" android:startColor="#00F2A65A" android:centerColor="@color/border_cyan_hi" android:endColor="#00F2A65A"/>
         </shape>
     </item>
 </layer-list>

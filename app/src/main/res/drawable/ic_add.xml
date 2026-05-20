@@ -5,6 +5,6 @@
     android:viewportHeight="24">
     <!-- Plus icon in accent_cyan -->
     <path
-        android:fillColor="#00E5FF"
+        android:fillColor="#F2A65A"
         android:pathData="M12,5 L14,5 L14,11 L20,11 L20,13 L14,13 L14,19 L12,19 L12,13 L6,13 L6,11 L12,11 Z"/>
 </vector>

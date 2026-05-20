@@ -1,30 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Glow rim -->
     <item>
         <shape android:shape="rectangle">
-            <corners android:topLeftRadius="28dp" android:topRightRadius="28dp"
-                android:bottomLeftRadius="0dp" android:bottomRightRadius="0dp"/>
-            <solid android:color="#2200F5FF"/>
+            <corners android:topLeftRadius="30dp" android:topRightRadius="30dp"/>
+            <solid android:color="@color/border_cyan"/>
         </shape>
     </item>
-    <!-- Glass body -->
     <item android:left="1dp" android:right="1dp" android:top="1dp">
         <shape android:shape="rectangle">
-            <corners android:topLeftRadius="27dp" android:topRightRadius="27dp"
-                android:bottomLeftRadius="0dp" android:bottomRightRadius="0dp"/>
-            <gradient android:type="linear" android:angle="270"
-                android:startColor="#F0091426" android:endColor="#E6071020"/>
-            <stroke android:width="1dp" android:color="#4400F5FF"/>
+            <corners android:topLeftRadius="29dp" android:topRightRadius="29dp"/>
+            <gradient android:angle="270" android:startColor="#F0221611" android:endColor="#EA120B08"/>
+            <stroke android:width="1dp" android:color="@color/border_cyan_hi"/>
         </shape>
     </item>
-    <!-- Top glass sheen -->
-    <item android:left="2dp" android:right="2dp" android:top="2dp" android:bottom="64dp">
+    <item android:left="2dp" android:right="2dp" android:top="2dp" android:bottom="70dp">
         <shape android:shape="rectangle">
-            <corners android:topLeftRadius="26dp" android:topRightRadius="26dp"
-                android:bottomLeftRadius="0dp" android:bottomRightRadius="0dp"/>
-            <gradient android:type="linear" android:angle="270"
-                android:startColor="#18FFFFFF" android:endColor="#00FFFFFF"/>
+            <corners android:topLeftRadius="28dp" android:topRightRadius="28dp"/>
+            <gradient android:angle="270" android:startColor="@color/glass_sheen_top" android:endColor="@color/glass_sheen_bot"/>
         </shape>
     </item>
 </layer-list>

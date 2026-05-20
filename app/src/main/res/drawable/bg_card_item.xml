@@ -1,28 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Glow border -->
     <item>
         <shape android:shape="rectangle">
-            <corners android:radius="18dp"/>
-            <solid android:color="#2200F5FF"/>
+            <corners android:radius="20dp"/>
+            <solid android:color="@color/border_cyan"/>
         </shape>
     </item>
-    <!-- Glass surface -->
     <item android:left="1dp" android:right="1dp" android:top="1dp" android:bottom="1dp">
         <shape android:shape="rectangle">
-            <corners android:radius="17dp"/>
-            <gradient android:type="linear" android:angle="270"
-                android:startColor="#D40C1830" android:endColor="#C4091222"/>
-            <stroke android:width="1dp" android:color="#3300F5FF"/>
+            <corners android:radius="19dp"/>
+            <gradient android:angle="270" android:startColor="#DA231710" android:endColor="#C6150E0A"/>
+            <stroke android:width="1dp" android:color="@color/border_cyan"/>
         </shape>
     </item>
-    <!-- Sheen -->
-    <item android:left="2dp" android:right="2dp" android:top="2dp" android:bottom="44dp">
+    <item android:left="2dp" android:right="2dp" android:top="2dp" android:bottom="48dp">
         <shape android:shape="rectangle">
-            <corners android:topLeftRadius="16dp" android:topRightRadius="16dp"
-                android:bottomLeftRadius="0dp" android:bottomRightRadius="0dp"/>
-            <gradient android:type="linear" android:angle="270"
-                android:startColor="#10FFFFFF" android:endColor="#00FFFFFF"/>
+            <corners android:topLeftRadius="18dp" android:topRightRadius="18dp"/>
+            <gradient android:angle="270" android:startColor="#14FFF6EE" android:endColor="#00FFF6EE"/>
         </shape>
     </item>
 </layer-list>
