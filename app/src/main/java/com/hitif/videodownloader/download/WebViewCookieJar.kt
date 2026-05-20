@@ -5,7 +5,7 @@ import android.webkit.CookieManager
 import okhttp3.Cookie
 import okhttp3.HttpUrl
 import okhttp3.CookieJar
-import okhttp3.toHttpUrl
+
 
 /**
  * OkHttp CookieJar that bridges Android's WebView CookieManager.
@@ -71,7 +71,7 @@ class WebViewCookieJar : CookieJar {
                         if (!domainCookies.isNullOrBlank()) {
                             // Parse and add unique cookies only
                             val parsed = parseCookies(
-                                cookieDomain.toHttpUrl(), domainCookies
+                                HttpUrl.parse(cookieDomain)!!, domainCookies
                             )
                             for (cookie in parsed) {
                                 if (cookie.name !in ytCookieNames) {
