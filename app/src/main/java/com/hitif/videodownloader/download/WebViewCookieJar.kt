@@ -69,10 +69,20 @@ class WebViewCookieJar : CookieJar {
                     try {
                         val domainCookies = cookieManager.getCookie(cookieDomain)
                         if (!domainCookies.isNullOrBlank()) {
-                            // Parse cookies using the target request URL (already an HttpUrl)
-                            // This avoids needing to parse the domain string — all HttpUrl
-                            // .get/.parse methods are extensions in OkHttp 4.x
-                            val parsed = parseCookies(url, domainCookies)
+                            // Build an HttpUrl for the cookie's source domain using Builder.
+                            // All HttpUrl.get()/parse() are Kotlin extension functions in
+                            // OkHttp 4.x and fail in strict compilation mode.
+                            // HttpUrl.Builder is a regular class and always available.
+                            val sourceHost = cookieDomain
+                                .removePrefix("https://").removePrefix("http://")
+                                .removeSuffix("/").substringBefore('/')
+                            val domainUrl = HttpUrl.Builder()
+                                .scheme("https").host(sourceHost).build()
+
+                            // Parse cookies against their OWN domain (not the target
+                            // googlevideo.com URL), otherwise Cookie.parse rejects them
+                            // because the domain doesn't match.
+                            val parsed = parseCookies(domainUrl, domainCookies)
                             for (cookie in parsed) {
                                 if (cookie.name !in ytCookieNames) {
                                     ytCookieNames.add(cookie.name)
