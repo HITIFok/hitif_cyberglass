@@ -5,6 +5,7 @@ import android.webkit.CookieManager
 import okhttp3.Cookie
 import okhttp3.HttpUrl
 import okhttp3.CookieJar
+import java.net.URL
 
 
 /**
@@ -71,7 +72,7 @@ class WebViewCookieJar : CookieJar {
                         if (!domainCookies.isNullOrBlank()) {
                             // Parse and add unique cookies only
                             val parsed = parseCookies(
-                                HttpUrl.parse(cookieDomain)!!, domainCookies
+                                HttpUrl.get(URL(cookieDomain)), domainCookies
                             )
                             for (cookie in parsed) {
                                 if (cookie.name !in ytCookieNames) {
