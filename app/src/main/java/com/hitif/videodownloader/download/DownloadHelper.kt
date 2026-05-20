@@ -7,6 +7,7 @@ import android.os.Environment
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
+import android.webkit.CookieManager
 import com.hitif.videodownloader.db.AppDatabase
 import com.hitif.videodownloader.db.DownloadRecord
 import com.hitif.videodownloader.model.MediaItem
@@ -703,7 +704,12 @@ object DownloadHelper {
             try {
                 Log.d(TAG, "YouTube: extracting via InnerTube API...")
 
-                val result = ytExtractor.extract(item.url, pageUrl)
+                // Get cookies from WebView for SAPISID → sapisidhash auth
+                val ytCookies = CookieManager.getInstance()
+                    .getCookie("https://www.youtube.com")
+                Log.d(TAG, "YouTube: cookies from WebView = ${ytCookies?.take(100)}...")
+
+                val result = ytExtractor.extract(item.url, pageUrl, cookies = ytCookies)
 
                 if (result == null) {
                     Log.e(TAG, "YouTube: extraction failed")

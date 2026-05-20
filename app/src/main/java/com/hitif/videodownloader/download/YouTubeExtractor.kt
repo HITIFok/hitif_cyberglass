@@ -7,88 +7,128 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLDecoder
+import java.security.MessageDigest
 
 /**
  * YouTubeExtractor — Extraction des streams YouTube via l'API InnerTube.
  *
- * POURQUOI LE PROBLEME 403 EXISTAIT :
+ * STRATEGIE D'EXTRACTION (DUAL CLIENT) :
  * ─────────────────────────────────────────────────────────────────────────
- * L'app interceptait les URLs googlevideo.com capturées par shouldInterceptRequest
- * ou le bridge JS. Ces URLs sont liees a la session/IP du WebView (parametre "ip="),
- * signees avec un token de session (parametre "sig="), et protegees par le
- * parametre "n" obfusque (throttling).
+ * 1. WEB client (clientName=1) + sapisidhash : Quand les cookies du WebView
+ *    sont disponibles (SAPISID). Meilleure compatibilite, formats 1080p+,
+ *    fonctionne pour les videos age-restreintes si connecte.
  *
- * Quand TurboDownloadEngine essayait de telecharger cette URL :
- *   - Sans les cookies YouTube valides
- *   - Sans le bon User-Agent
- *   - Parfois depuis une IP differente
- * → YouTube repondait 403 Forbidden.
+ * 2. ANDROID client (clientName=3) : Fallback sans cookies. Fonctionne pour
+ *    les videos publiques uniquement.
  *
- * SOLUTION :
- * ─────────────────────────────────────────────────────────────────────────
- * Au lieu d'utiliser l'URL interceptee (liee a la session WebView), on appelle
- * directement l'API InnerTube de YouTube avec le client ANDROID.
- *
- * Le client ANDROID retourne des URLs "signees differemment" :
- *   - Pas de parametre "n" a decoder
- *   - Pas de signatureCipher a dechiffrer
- *   - URLs directement telechargeables avec User-Agent Android
+ * POURQUOI L'ANCIENNE APPROCHE ECHOUAIT :
+ * Le client ANDROID (v19.29.37) sans SAPISIDHASH etait bloque par YouTube
+ * car la version etait obsolete et trop de requetes non-authentifiees sont
+ * desormais rejetees avec playabilityStatus=LOGIN_REQUIRED.
  */
 class YouTubeExtractor {
 
     companion object {
         private const val TAG = "YouTubeExtractor"
 
-        // API InnerTube — client ANDROID
+        // API InnerTube endpoint
         private const val INNERTUBE_URL =
             "https://www.youtube.com/youtubei/v1/player?prettyPrint=false"
 
-        // User-Agent du client officiel YouTube Android
-        private const val YT_ANDROID_UA =
-            "com.google.android.youtube/19.29.37 (Linux; U; Android 11; en_US) gzip"
+        private const val ORIGIN = "https://www.youtube.com"
 
-        private val INNERTUBE_HEADERS = mapOf(
-            "Content-Type"              to "application/json; charset=UTF-8",
-            "User-Agent"                to YT_ANDROID_UA,
-            "X-YouTube-Client-Name"     to "3",
-            "X-YouTube-Client-Version"  to "19.29.37",
-            "X-Goog-Api-Format-Version" to "1",
-            "Accept-Language"           to "en-US,en;q=0.9",
-            "Origin"                    to "https://www.youtube.com",
-            "Referer"                   to "https://www.youtube.com/"
-        )
+        // ── WEB client (primaire — avec cookies) ──────────────────────
+        private const val WEB_CLIENT_VERSION = "2.20250513.00.00"
+        private const val WEB_UA =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+            "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
-        private fun buildInnerTubeBody(videoId: String): String = """
-            {
-              "videoId": "$videoId",
-              "context": {
-                "client": {
-                  "clientName": "ANDROID",
-                  "clientVersion": "19.29.37",
-                  "androidSdkVersion": 30,
-                  "osName": "Android",
-                  "osVersion": "11.0",
-                  "hl": "en",
-                  "gl": "US",
-                  "utcOffsetMinutes": 0,
-                  "userAgent": "$YT_ANDROID_UA",
-                  "timeZone": "UTC"
-                }
-              },
-              "playbackContext": {
-                "contentPlaybackContext": {
-                  "html5Preference": "HTML5_PREF_WANTS",
-                  "autoCaptionsDefaultOn": false,
-                  "lactMilliseconds": "-1"
-                }
-              },
-              "contentCheckOk": true,
-              "racyCheckOk": true
+        // ── ANDROID client (fallback — sans cookies) ──────────────────
+        private const val ANDROID_CLIENT_VERSION = "19.45.36"
+        private const val ANDROID_UA =
+            "com.google.android.youtube/$ANDROID_CLIENT_VERSION " +
+            "(Linux; U; Android 14; en_US) gzip"
+
+        /**
+         * Calcule le sapisidhash pour l'authorization header.
+         * Format: SAPISIDHASH <timestamp>_<SHA1(timestamp + " " + SAPISID + " " + origin)>
+         */
+        fun computeSapisidhash(sapisid: String, origin: String = ORIGIN): String {
+            val timestamp = (System.currentTimeMillis() / 1000).toString()
+            val input = "$timestamp $sapisid $origin"
+            val digest = MessageDigest.getInstance("SHA-1").digest(input.toByteArray())
+            val hash = digest.joinToString("") { "%02x".format(it) }
+            return "SAPISIDHASH $timestamp_$hash"
+        }
+
+        /** Extrait le cookie SAPISID depuis une chaine de cookies */
+        fun extractSapisid(cookies: String?): String? {
+            if (cookies.isNullOrEmpty()) return null
+            // Parse cookie string "name=value; name2=value2; ..."
+            val cookieMap = cookies.split(";").associate { entry ->
+                val parts = entry.trim().split("=", limit = 2)
+                if (parts.size == 2) parts[0].trim() to parts[1].trim()
+                else parts[0].trim() to ""
             }
-        """.trimIndent()
+            return cookieMap["SAPISID"] ?: cookieMap["__Secure-3PAPISID"]
+        }
+
+        fun buildInnerTubeBody(videoId: String, useWebClient: Boolean): String {
+            return if (useWebClient) """
+                {
+                  "videoId": "$videoId",
+                  "context": {
+                    "client": {
+                      "clientName": "WEB",
+                      "clientVersion": "$WEB_CLIENT_VERSION",
+                      "hl": "en",
+                      "gl": "US",
+                      "userAgent": "$WEB_UA"
+                    }
+                  },
+                  "playbackContext": {
+                    "contentPlaybackContext": {
+                      "html5Preference": "HTML5_PREF_WANTS",
+                      "autoCaptionsDefaultOn": false,
+                      "lactMilliseconds": "-1"
+                    }
+                  },
+                  "contentCheckOk": true,
+                  "racyCheckOk": true
+                }
+            """.trimIndent() else """
+                {
+                  "videoId": "$videoId",
+                  "context": {
+                    "client": {
+                      "clientName": "ANDROID",
+                      "clientVersion": "$ANDROID_CLIENT_VERSION",
+                      "androidSdkVersion": 34,
+                      "osName": "Android",
+                      "osVersion": "14.0",
+                      "hl": "en",
+                      "gl": "US",
+                      "utcOffsetMinutes": 0,
+                      "userAgent": "$ANDROID_UA",
+                      "timeZone": "UTC"
+                    }
+                  },
+                  "playbackContext": {
+                    "contentPlaybackContext": {
+                      "html5Preference": "HTML5_PREF_WANTS",
+                      "autoCaptionsDefaultOn": false,
+                      "lactMilliseconds": "-1"
+                    }
+                  },
+                  "contentCheckOk": true,
+                  "racyCheckOk": true
+                }
+            """.trimIndent()
+        }
 
         /** Extrait l'ID video depuis une URL YouTube */
         fun extractVideoId(url: String): String? {
+            if (url.isBlank()) return null
             val patterns = listOf(
                 Regex("""(?:v=|v/|embed/|shorts/|youtu\.be/)([a-zA-Z0-9_-]{11})"""),
                 Regex("""^([a-zA-Z0-9_-]{11})$""")
@@ -203,41 +243,107 @@ class YouTubeExtractor {
     /**
      * Extrait les streams pour une URL YouTube.
      * @param youtubeUrl URL YouTube ou googlevideo
-     * @param pageUrl URL de la page courante (pour Referer et extraction videoId)
+     * @param pageUrl URL de la page courante (pour extraction videoId)
+     * @param cookies Cookies du WebView (pour sapisidhash auth)
      */
-    suspend fun extract(youtubeUrl: String, pageUrl: String? = null): ExtractionResult? =
-        withContext(Dispatchers.IO) {
-            val videoId = extractVideoId(youtubeUrl)
-                ?: extractVideoId(pageUrl ?: "")
-                ?: run {
-                    Log.e(TAG, "Impossible d'extraire l'ID video depuis: $youtubeUrl")
-                    return@withContext null
-                }
-            Log.d(TAG, "Extraction InnerTube pour videoId: $videoId")
-            callInnerTubeApi(videoId)
+    suspend fun extract(
+        youtubeUrl: String,
+        pageUrl: String? = null,
+        cookies: String? = null
+    ): ExtractionResult? = withContext(Dispatchers.IO) {
+        val videoId = extractVideoId(youtubeUrl)
+            ?: extractVideoId(pageUrl ?: "")
+            ?: run {
+                Log.e(TAG, "Impossible d'extraire l'ID video depuis: $youtubeUrl (pageUrl=$pageUrl)")
+                return@withContext null
+            }
+        Log.d(TAG, "Extraction InnerTube pour videoId: $videoId")
+
+        val sapisid = extractSapisid(cookies)
+
+        if (sapisid != null) {
+            Log.d(TAG, "SAPISID found — using WEB client with sapisidhash")
+            callInnerTubeApi(videoId, useWebClient = true, sapisid = sapisid)
+        } else {
+            Log.d(TAG, "No SAPISID cookie — falling back to ANDROID client")
+            // Try ANDROID client first (no auth needed for public videos)
+            val result = callInnerTubeApi(videoId, useWebClient = false, sapisid = null)
+            if (result == null) {
+                // Retry with WEB client even without SAPISID (some public videos work)
+                Log.d(TAG, "ANDROID client failed — retrying with WEB client (no auth)")
+                callInnerTubeApi(videoId, useWebClient = true, sapisid = null)
+            } else {
+                result
+            }
         }
+    }
 
     suspend fun extractByVideoId(videoId: String): ExtractionResult? =
-        withContext(Dispatchers.IO) { callInnerTubeApi(videoId) }
+        withContext(Dispatchers.IO) {
+            callInnerTubeApi(videoId, useWebClient = false, sapisid = null)
+        }
 
-    private fun callInnerTubeApi(videoId: String): ExtractionResult? {
+    private fun callInnerTubeApi(
+        videoId: String,
+        useWebClient: Boolean,
+        sapisid: String?
+    ): ExtractionResult? {
+        val connection: HttpURLConnection
         try {
-            val connection = URL(INNERTUBE_URL).openConnection() as HttpURLConnection
+            connection = URL(INNERTUBE_URL).openConnection() as HttpURLConnection
+        } catch (e: Exception) {
+            Log.e(TAG, "Erreur connexion InnerTube: ${e.message}")
+            return null
+        }
+
+        try {
             connection.apply {
                 requestMethod = "POST"
                 connectTimeout = 15_000
                 readTimeout = 30_000
                 doOutput = true
-                INNERTUBE_HEADERS.forEach { (k, v) -> setRequestProperty(k, v) }
+                instanceFollowRedirects = false
             }
 
-            val body = buildInnerTubeBody(videoId).toByteArray(Charsets.UTF_8)
+            // ── Headers ──────────────────────────────────────────────
+            if (useWebClient) {
+                connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                connection.setRequestProperty("User-Agent", WEB_UA)
+                connection.setRequestProperty("X-YouTube-Client-Name", "1")
+                connection.setRequestProperty("X-YouTube-Client-Version", WEB_CLIENT_VERSION)
+                connection.setRequestProperty("X-Goog-Api-Format-Version", "1")
+                connection.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
+                connection.setRequestProperty("Origin", ORIGIN)
+                connection.setRequestProperty("Referer", "$ORIGIN/")
+
+                // Authorization avec sapisidhash
+                if (sapisid != null) {
+                    val authHeader = computeSapisidhash(sapisid)
+                    connection.setRequestProperty("Authorization", authHeader)
+                    connection.setRequestProperty("X-Goog-AuthUser", "0")
+                    Log.d(TAG, "Authorization: $authHeader")
+                }
+            } else {
+                connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                connection.setRequestProperty("User-Agent", ANDROID_UA)
+                connection.setRequestProperty("X-YouTube-Client-Name", "3")
+                connection.setRequestProperty("X-YouTube-Client-Version", ANDROID_CLIENT_VERSION)
+                connection.setRequestProperty("X-Goog-Api-Format-Version", "1")
+                connection.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
+                connection.setRequestProperty("Origin", ORIGIN)
+                connection.setRequestProperty("Referer", "$ORIGIN/")
+            }
+
+            // ── Send request ─────────────────────────────────────────
+            val body = buildInnerTubeBody(videoId, useWebClient).toByteArray(Charsets.UTF_8)
             connection.outputStream.use { it.write(body) }
 
+            // ── Read response ────────────────────────────────────────
             val responseCode = connection.responseCode
             if (responseCode != 200) {
                 val errorBody = connection.errorStream?.bufferedReader()?.readText()
-                Log.e(TAG, "InnerTube API erreur HTTP $responseCode pour videoId=$videoId: ${errorBody?.take(300)}")
+                Log.e(TAG, "InnerTube HTTP $responseCode (${if (useWebClient) "WEB" else "ANDROID"}) " +
+                    "pour videoId=$videoId: ${errorBody?.take(500)}")
                 connection.disconnect()
                 return null
             }
@@ -245,25 +351,42 @@ class YouTubeExtractor {
             val responseText = connection.inputStream.bufferedReader().readText()
             connection.disconnect()
 
-            return parseInnerTubeResponse(videoId, responseText)
+            return parseInnerTubeResponse(videoId, responseText, useWebClient)
 
         } catch (e: Exception) {
-            Log.e(TAG, "Erreur InnerTube API: ${e.message}", e)
+            Log.e(TAG, "Erreur InnerTube API (${if (useWebClient) "WEB" else "ANDROID"}): ${e.message}", e)
+            connection.disconnect()
             return null
         }
     }
 
-    private fun parseInnerTubeResponse(videoId: String, json: String): ExtractionResult? {
+    private fun parseInnerTubeResponse(
+        videoId: String,
+        json: String,
+        useWebClient: Boolean
+    ): ExtractionResult? {
         try {
             val root = JSONObject(json)
 
-            // Verifier le statut
+            // Verifier le statut de lecture
             val playabilityStatus = root.optJSONObject("playabilityStatus")
             val status = playabilityStatus?.optString("status")
-            if (status == "ERROR" || status == "LOGIN_REQUIRED") {
+            if (status == "ERROR") {
                 val reason = playabilityStatus?.optString("reason") ?: "Inconnu"
-                Log.e(TAG, "Video non disponible: $status — $reason")
+                Log.e(TAG, "Video ERROR ($videoId): $reason")
                 return null
+            }
+            if (status == "LOGIN_REQUIRED") {
+                val messages = playabilityStatus?.optJSONArray("messages")
+                val msg = if (messages != null && messages.length() > 0) messages.getString(0) else "N/A"
+                Log.e(TAG, "Video LOGIN_REQUIRED ($videoId): $msg " +
+                    "[client=${if (useWebClient) "WEB" else "ANDROID"}]")
+                return null
+            }
+            // Log non-OK status for debugging
+            if (status != null && status != "OK") {
+                val reason = playabilityStatus?.optString("reason") ?: ""
+                Log.w(TAG, "Playability status=$status reason=$reason ($videoId)")
             }
 
             // Metadonnees
@@ -276,9 +399,18 @@ class YouTubeExtractor {
                 thumbnails.getJSONObject(thumbnails.length() - 1).optString("url") ?: ""
             else ""
 
-            // Streaming data
-            val streamingData = root.optJSONObject("streamingData") ?: run {
-                Log.e(TAG, "Pas de streamingData dans la reponse InnerTube")
+            // Streaming data — CRITICAL
+            val streamingData = root.optJSONObject("streamingData")
+            if (streamingData == null) {
+                // Video might be a live stream or otherwise restricted
+                val isLive = videoDetails?.optBoolean("isLive", false) ?: false
+                val isLiveContent = videoDetails?.optBoolean("isLiveContent", false) ?: false
+                if (isLive || isLiveContent) {
+                    Log.w(TAG, "Video $videoId est un live — pas de streamingData")
+                } else {
+                    Log.e(TAG, "Pas de streamingData pour $videoId. " +
+                        "playability=$status, title='$title'")
+                }
                 return null
             }
 
@@ -289,7 +421,7 @@ class YouTubeExtractor {
             val videoOnlyFormats = mutableListOf<YouTubeStream>()
             val audioOnlyFormats = mutableListOf<YouTubeStream>()
 
-            // formats = muxes (video+audio, max 720p)
+            // formats = muxed (video+audio combined, typically max 720p)
             streamingData.optJSONArray("formats")?.let { arr ->
                 for (i in 0 until arr.length()) {
                     parseFormat(arr.getJSONObject(i), hasVideo = true, hasAudio = true)
@@ -297,7 +429,7 @@ class YouTubeExtractor {
                 }
             }
 
-            // adaptiveFormats = DASH (video seul OU audio seul)
+            // adaptiveFormats = DASH (video-only OR audio-only)
             streamingData.optJSONArray("adaptiveFormats")?.let { arr ->
                 for (i in 0 until arr.length()) {
                     val obj = arr.getJSONObject(i)
@@ -315,11 +447,12 @@ class YouTubeExtractor {
                 }
             }
 
+            val totalFormats = muxedFormats.size + videoOnlyFormats.size + audioOnlyFormats.size
             Log.d(TAG,
-                "Extraction reussie: $title | " +
-                "muxed=${muxedFormats.size} | " +
-                "video=${videoOnlyFormats.size} | " +
-                "audio=${audioOnlyFormats.size}"
+                "Extraction OK ($videoId): '$title' | " +
+                "muxed=${muxedFormats.size} video=${videoOnlyFormats.size} " +
+                "audio=${audioOnlyFormats.size} total=$totalFormats" +
+                if (hlsManifestUrl != null) " +HLS" else ""
             )
 
             return ExtractionResult(
@@ -334,7 +467,7 @@ class YouTubeExtractor {
             )
 
         } catch (e: Exception) {
-            Log.e(TAG, "Erreur parsing reponse InnerTube: ${e.message}", e)
+            Log.e(TAG, "Erreur parsing reponse InnerTube ($videoId): ${e.message}", e)
             return null
         }
     }
@@ -368,11 +501,23 @@ class YouTubeExtractor {
                 itag = itag, fps = fps, audioQuality = audioQuality
             )
         } catch (e: Exception) {
-            Log.w(TAG, "Impossible de parser le format: ${e.message}")
+            Log.w(TAG, "Impossible de parser le format itag=${obj.optInt("itag")}: ${e.message}")
             return null
         }
     }
 
+    /**
+     * Decode signatureCipher / cipher parameter into a download URL.
+     *
+     * For the WEB client, formats may have signatureCipher instead of direct URL.
+     * The cipher contains: url, s (obfuscated signature), sp (sig param name), n (nsig).
+     *
+     * NOTE: The 's' parameter is an obfuscated signature that normally needs to be
+     * decoded using the YouTube player's JavaScript signature function. However,
+     * when using the WEB client with valid sapisidhash, the InnerTube API often
+     * returns direct URLs (no cipher needed) or cipher with pre-decoded 'sig'.
+     * If extraction still fails, full nsig deobfuscation would be needed.
+     */
     private fun decodeCipher(cipher: String?): String? {
         if (cipher == null) return null
         try {
@@ -400,8 +545,8 @@ class YouTubeExtractor {
                 decodedUrl.append("&n=").append(nsig)
             }
 
-            // Also include any other known useful parameters
-            val dn = params["dn"] // digital nonce
+            // Digital nonce
+            val dn = params["dn"]
             if (dn != null) {
                 decodedUrl.append("&dn=").append(dn)
             }
