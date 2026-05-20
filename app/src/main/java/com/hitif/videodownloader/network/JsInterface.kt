@@ -67,10 +67,11 @@ class JsInterface(
         // YouTube format: type starts with "youtube_" and contains quality info
         if (type.startsWith("youtube_")) {
             // Validate: YouTube format URLs MUST come from googlevideo.com
-            // This prevents false positives where internal audio files are
-            // incorrectly tagged as YouTube formats by the JS bridge
-            if (!url.contains("googlevideo.com")) {
-                Log.d(TAG, "onMedia: skipping non-googlevideo YouTube URL: ${url.take(80)}")
+            // IMPORTANT: googlevideo.com URLs are now BLOCKED because they are
+            // session-bound (403 Forbidden). YouTubeExtractor handles YouTube via
+            // InnerTube API instead. We block these to prevent false detections.
+            if (url.contains("googlevideo.com")) {
+                Log.d(TAG, "onMedia: blocking googlevideo.com URL (session-bound): ${url.take(80)}")
                 return
             }
             val detail = type.removePrefix("youtube_")

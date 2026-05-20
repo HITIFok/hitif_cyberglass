@@ -227,56 +227,38 @@ object JsBridge {
       for (var fi = 0; fi < allFormats.length; fi++) {
         var fmt = allFormats[fi];
         var url = fmt.url;
-        if (!url && fmt.cipher) {
-          // Decode cipher URL (base64 + swap params)
-          try {
-            var parts = fmt.cipher.split('&');
-            var params = {};
-            for (var pi = 0; pi < parts.length; pi++) {
-              var kv = parts[pi].split('=');
-              params[kv[0]] = kv[1];
-            }
-            if (params.s && params.sp) {
-              var decodedS = decodeURIComponent(escape(atob(params.s)));
-              url = url || (params.url || '');
-              url += '&' + params.sp + '=' + encodeURIComponent(decodedS);
-            }
-            if (params.url) url = params.url + '&' + (params.sp || 'sig') + '=' +
-              encodeURIComponent(decodeURIComponent(escape(atob(params.s || ''))));
-          } catch(ciphErr) {
-            // If cipher decode fails, try signatureCipher
-            try {
-              var sc = fmt.signatureCipher;
-              if (sc) {
-                var scParts = sc.split('&');
-                var scParams = {};
-                for (var sci = 0; sci < scParts.length; sci++) {
-                  var scKv = scParts[sci].split('=');
-                  scParams[scKv[0]] = scKv[1];
-                }
-                url = scParams.url || '';
-                if (scParams.s) {
-                  var scDecoded = decodeURIComponent(escape(atob(scParams.s)));
-                  url += '&' + (scParams.sp || 'sig') + '=' + encodeURIComponent(scDecoded);
-                }
-              }
-            } catch(scErr) {}
+        // Helper function to decode cipher/signatureCipher with all params (including n/nsig)
+        function decodeCipherToUrl(cipherStr) {
+          if (!cipherStr) return null;
+          var parts = cipherStr.split('&');
+          var params = {};
+          for (var pi = 0; pi < parts.length; pi++) {
+            var kv = parts[pi].split('=');
+            if (kv.length === 2) params[kv[0]] = kv[1];
           }
-        } else if (!url && fmt.signatureCipher) {
-          try {
-            var sc2 = fmt.signatureCipher;
-            var sc2Parts = sc2.split('&');
-            var sc2Params = {};
-            for (var sc2i = 0; sc2i < sc2Parts.length; sc2i++) {
-              var sc2Kv = sc2Parts[sc2i].split('=');
-              sc2Params[sc2Kv[0]] = sc2Kv[1];
+          var decodedUrl = params.url || '';
+          if (!decodedUrl) return null;
+          // Signature: s (base64) -> sp param
+          if (params.s && params.sp) {
+            try {
+              var decodedS = decodeURIComponent(escape(atob(params.s)));
+              decodedUrl += '&' + params.sp + '=' + encodeURIComponent(decodedS);
+            } catch(e) {
+              decodedUrl += '&' + (params.sp || 'sig') + '=' + params.s;
             }
-            url = sc2Params.url || '';
-            if (sc2Params.s) {
-              var sc2Decoded = decodeURIComponent(escape(atob(sc2Params.s)));
-              url += '&' + (sc2Params.sp || 'sig') + '=' + encodeURIComponent(sc2Decoded);
-            }
-          } catch(sc2Err) {}
+          }
+          // nsig parameter (n) — YouTube throttling signature
+          if (params.n) {
+            decodedUrl += '&n=' + params.n;
+          }
+          // Digital nonce (dn)
+          if (params.dn) {
+            decodedUrl += '&dn=' + params.dn;
+          }
+          return decodedUrl;
+        }
+        if (!url) {
+          url = decodeCipherToUrl(fmt.cipher) || decodeCipherToUrl(fmt.signatureCipher) || '';
         }
 
         if (!url || url.length < 20) continue;

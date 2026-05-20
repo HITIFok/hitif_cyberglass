@@ -7,7 +7,6 @@ import android.os.Environment
 import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
-import android.webkit.CookieManager
 import com.hitif.videodownloader.db.AppDatabase
 import com.hitif.videodownloader.db.DownloadRecord
 import com.hitif.videodownloader.model.MediaItem
@@ -135,27 +134,41 @@ object DownloadHelper {
         }
     }
 
+    // YouTube extractor instance
+    private val ytExtractor = YouTubeExtractor()
+
     // =========================================================================
     // Public API
     // =========================================================================
 
     /**
      * Single download — starts immediately (bypasses semaphore).
+     * Routes YouTube URLs through InnerTube API for fresh, non-session-bound URLs.
      *
      * @param context  Application or activity context
      * @param item     The media item to download
      * @param customFilename  Optional custom base name (without extension).
      *                        If null, SmartNaming auto-generates the name.
      *                        The extension is always inferred from media type.
+     * @param pageUrl  Optional page URL for YouTube video ID extraction
      */
     fun enqueue(
         context: android.content.Context,
         item: MediaItem,
-        customFilename: String? = null
+        customFilename: String? = null,
+        pageUrl: String? = null
     ): Long {
         if (!initialized) init(context)
+
+        // ── YouTube routing via InnerTube API ─────────────────────────
+        if (isYouTubeUrl(item.url) || (pageUrl != null && isYouTubeUrl(pageUrl))) {
+            Log.d(TAG, "YouTube URL detected — routing via InnerTube API: ${item.url.take(80)}")
+            downloadYouTube(context, item, customFilename, pageUrl)
+            return -1L
+        }
+
+        // ── Standard download via TurboDownloadEngine ──────────────────
         val naming = SmartNaming.build(item)
-        // If a custom filename is provided, override the auto-generated one
         val effectiveNaming = if (customFilename != null) {
             val ext = naming.extension
             naming.copy(
@@ -577,50 +590,38 @@ object DownloadHelper {
     }
 
     private fun buildHeaders(item: MediaItem): Map<String, String> = buildMap {
-        // YouTube-specific: add Referer and sec-fetch headers to avoid 403
         val isYoutube = item.url.contains("googlevideo.com")
+
         if (isYoutube) {
-            if (item.pageUrl.isNotBlank()) put("Referer", item.pageUrl)
+            // YouTube/GoogleVideo-specific headers to prevent 403 Forbidden.
+            // The Referer must be the YouTube watch page that generated this URL.
+            val referer = if (item.pageUrl.isNotBlank() &&
+                item.pageUrl.contains("youtube.com")) {
+                item.pageUrl
+            } else {
+                "https://www.youtube.com/"
+            }
+            put("Referer", referer)
             put("Origin", "https://www.youtube.com")
-            put("Sec-Fetch-Dest", "empty")
+            put("Sec-Fetch-Dest", "video")
             put("Sec-Fetch-Mode", "cors")
             put("Sec-Fetch-Site", "cross-site")
+            put("Accept", "*/*")
+            put("Accept-Encoding", "identity")
+            put("Accept-Language", "en-US,en;q=0.9")
+            put("Range", "bytes=0-")
+            Log.d(TAG, "YouTube headers: Referer=$referer")
         } else {
             if (item.pageUrl.isNotBlank()) put("Referer", item.pageUrl)
         }
 
-        try {
-            val cookieManager = CookieManager.getInstance()
-            val cookieUrls = mutableListOf<String>()
-            if (item.pageUrl.isNotBlank()) cookieUrls.add(item.pageUrl)
-            // For YouTube, also get cookies from youtube.com domain
-            if (isYoutube) {
-                cookieUrls.add("https://www.youtube.com/")
-                cookieUrls.add("https://youtube.com/")
-            }
-            try {
-                val mediaHost = URL(item.url).host ?: ""
-                if (mediaHost.isNotBlank() && item.url != item.pageUrl.substringBefore('/')) {
-                    cookieUrls.add("${URL(item.url).protocol}://$mediaHost/")
-                }
-            } catch (_: Exception) {}
-
-            val cookieBuilder = StringBuilder()
-            for (cookieUrl in cookieUrls) {
-                val cookies = cookieManager.getCookie(cookieUrl)
-                if (!cookies.isNullOrBlank()) {
-                    if (cookieBuilder.isNotEmpty()) cookieBuilder.append("; ")
-                    cookieBuilder.append(cookies)
-                }
-            }
-            val allCookies = cookieBuilder.toString().trim()
-            if (allCookies.isNotEmpty()) {
-                put("Cookie", allCookies)
-                Log.d(TAG, "Cookies attached for: ${item.url.substringBefore('?').take(80)}")
-            }
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed to extract cookies: ${e.message}")
-        }
+        // NOTE: Do NOT set Cookie header manually here.
+        // OkHttp's BridgeInterceptor calls WebViewCookieJar.loadForRequest()
+        // and REPLACES any manually-set Cookie header with the CookieJar result.
+        // YouTube session cookies are now forwarded by WebViewCookieJar
+        // (which merges youtube.com cookies into googlevideo.com requests).
+        // Setting Cookie here would be silently overwritten and is misleading.
+        Log.d(TAG, "Headers built for: ${item.url.substringBefore('?').take(80)}")
 
         put("User-Agent",
             "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 " +
@@ -658,4 +659,173 @@ object DownloadHelper {
             }
         }
     }
+
+    // ========================================================================
+    // YouTube download via InnerTube API
+    // ========================================================================
+
+    /**
+     * Download a YouTube video using InnerTube API + YouTubeDownloadTask.
+     * This bypasses the session-bound googlevideo.com URLs entirely by calling
+     * the InnerTube API to get fresh, non-session-bound download URLs.
+     */
+    private fun downloadYouTube(
+        context: android.content.Context,
+        item: MediaItem,
+        customFilename: String?,
+        pageUrl: String?
+    ) {
+        val db = AppDatabase.getInstance(context)
+        val safeFilename = customFilename ?: sanitizeForFs(item.pageTitle.ifBlank { "YouTube_${System.currentTimeMillis()}" })
+
+        // Insert DOWNLOADING record
+        scope.launch {
+            try {
+                db.downloadDao().insert(
+                    DownloadRecord(
+                        downloadManagerId = -1L,
+                        url = item.url, filename = "$safeFilename.mp4",
+                        pageTitle = item.pageTitle, pageUrl = item.pageUrl,
+                        mimeType = "video/mp4", mediaType = MediaType.VIDEO.name,
+                        sizeBytes = item.sizeBytes,
+                        state = "DOWNLOADING", startedAt = System.currentTimeMillis()
+                    )
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to insert YouTube record: ${e.message}")
+            }
+            ensureService(context)
+        }
+
+        onDownloadStarted(context)
+
+        scope.launch {
+            try {
+                Log.d(TAG, "YouTube: extracting via InnerTube API...")
+
+                val result = ytExtractor.extract(item.url, pageUrl)
+
+                if (result == null) {
+                    Log.e(TAG, "YouTube: extraction failed")
+                    scope.launch {
+                        try {
+                            db.downloadDao().updateStateByUrl(
+                                url = item.url, state = "FAILED",
+                                ts = System.currentTimeMillis()
+                            )
+                        } catch (_: Exception) {}
+                    }
+                    DownloadNotificationManager.showError(
+                        item.url, "$safeFilename.mp4",
+                        "Extraction impossible. Video peut-etre privee ou geo-bloquee."
+                    )
+                    onDownloadEnded()
+                    return@launch
+                }
+
+                Log.d(TAG, "YouTube: extraction OK — ${result.title} | " +
+                    "muxed=${result.muxedFormats.size} | " +
+                    "video=${result.videoOnlyFormats.size} | " +
+                    "audio=${result.audioOnlyFormats.size}")
+
+                val outputDir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    "HITIF/Video"
+                )
+                val cleanFileName = customFilename ?: sanitizeForFs(result.title.ifEmpty { safeFilename })
+
+                val task = YouTubeDownloadTask()
+                task.download(
+                    context = context,
+                    result = result,
+                    outputDir = outputDir,
+                    fileName = cleanFileName,
+                    callback = object : YouTubeDownloadTask.ProgressCallback {
+                        override fun onProgress(percent: Int, downloadedBytes: Long, totalBytes: Long) {
+                            try {
+                                DownloadNotificationManager.showProgress(
+                                    url = item.url, title = "$cleanFileName.mp4",
+                                    bytesDownloaded = downloadedBytes,
+                                    totalBytes = totalBytes,
+                                    speedBps = 0, percent = percent
+                                )
+                            } catch (_: Exception) {}
+                        }
+
+                        override fun onMerging() {
+                            Log.d(TAG, "YouTube: merging audio+video...")
+                            try {
+                                DownloadNotificationManager.showProgress(
+                                    url = item.url, title = "$cleanFileName.mp4",
+                                    bytesDownloaded = 0, totalBytes = 1,
+                                    speedBps = 0, percent = 92
+                                )
+                            } catch (_: Exception) {}
+                        }
+
+                        override fun onSuccess(file: File) {
+                            onDownloadEnded()
+                            Log.d(TAG, "YouTube: download complete → ${file.absolutePath} (${file.length() / 1024}KB)")
+                            try {
+                                runBlocking {
+                                    db.downloadDao().completeDownloadByUrl(
+                                        url = item.url, state = "COMPLETED",
+                                        ts = System.currentTimeMillis(), fileSize = file.length()
+                                    )
+                                }
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Failed to complete YouTube record: ${e.message}")
+                            }
+                            try {
+                                DownloadNotificationManager.showComplete(item.url, "$cleanFileName.mp4", file.length())
+                                android.media.MediaScannerConnection.scanFile(
+                                    context, arrayOf(file.absolutePath),
+                                    arrayOf("video/mp4"), null
+                                )
+                            } catch (_: Exception) {}
+                        }
+
+                        override fun onError(message: String) {
+                            onDownloadEnded()
+                            Log.e(TAG, "YouTube: download error — $message")
+                            try {
+                                scope.launch {
+                                    try {
+                                        db.downloadDao().updateStateByUrl(
+                                            url = item.url, state = "FAILED",
+                                            ts = System.currentTimeMillis()
+                                        )
+                                    } catch (_: Exception) {}
+                                }
+                                DownloadNotificationManager.showError(item.url, "$cleanFileName.mp4", message)
+                            } catch (_: Exception) {}
+                        }
+                    }
+                )
+
+            } catch (e: Exception) {
+                Log.e(TAG, "YouTube: exception — ${e.message}", e)
+                onDownloadEnded()
+                try {
+                    scope.launch {
+                        try {
+                            db.downloadDao().updateStateByUrl(
+                                url = item.url, state = "FAILED",
+                                ts = System.currentTimeMillis()
+                            )
+                        } catch (_: Exception) {}
+                    }
+                    DownloadNotificationManager.showError(item.url, "$safeFilename.mp4", e.message ?: "Erreur inconnue")
+                } catch (_: Exception) {}
+            }
+        }
+    }
+
+    private fun isYouTubeUrl(url: String): Boolean =
+        YouTubeExtractor.isYouTubeUrl(url)
+
+    private fun sanitizeForFs(name: String): String =
+        name.replace(Regex("""[\\/:*?"<>|]"""), "_")
+            .replace(Regex("""\s+"""), "_")
+            .take(180)
 }

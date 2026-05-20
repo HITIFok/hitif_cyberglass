@@ -27,6 +27,9 @@ import com.hitif.videodownloader.databinding.ActivityBrowserBinding
 import com.hitif.videodownloader.download.WebViewFetchHelper
 import com.hitif.videodownloader.network.JsBridge
 import com.hitif.videodownloader.network.JsInterface
+import com.hitif.videodownloader.model.MediaItem
+import com.hitif.videodownloader.model.MediaType
+import com.hitif.videodownloader.download.YouTubeExtractor
 
 class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
 
@@ -125,6 +128,9 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
                 vm.updateMediaBase(url)
                 vm.updateCurrentTab(url, title)
                 view.evaluateJavascript(JsBridge.INJECT_SCRIPT, null)
+
+                // Detect YouTube pages and create a MediaItem for InnerTube extraction
+                detectYouTubePage(url, title)
 
                 // Start or stop YouTube refresh timer based on current URL
                 scheduleYoutubeRefresh(url)
@@ -246,6 +252,36 @@ class BrowserActivity : AppCompatActivity(), TabSwitcherListener {
             val title = vm.pageTitle.value ?: url
             vm.toggleFavorite(url, title)
         }
+    }
+
+    // ── YouTube page detection (InnerTube API route) ──────────────────
+    // Instead of intercepting session-bound googlevideo.com URLs (403),
+    // we detect the YouTube page URL itself and create a MediaItem.
+    // DownloadHelper routes this through YouTubeExtractor → InnerTube API.
+
+    private fun detectYouTubePage(pageUrl: String, pageTitle: String?) {
+        if (!YouTubeExtractor.isYouTubePageUrl(pageUrl)) return
+        val videoId = YouTubeExtractor.extractVideoId(pageUrl) ?: return
+
+        // Avoid duplicates — check if we already have a YouTube item for this video
+        val currentItems = vm.mediaItems.value.orEmpty()
+        if (currentItems.any { it.url.contains(videoId) }) return
+
+        Log.d(TAG, "YouTube page detected: videoId=$videoId title=$pageTitle")
+
+        val item = MediaItem(
+            url = pageUrl,  // The page URL, NOT googlevideo
+            filename = "${pageTitle?.take(80)?.replace(Regex(\"[\\\\/:*?\\\"<>|]+\"), \"_\")?.replace(Regex(\"\\\\s+\"), \"_\") ?: \"YouTube_${videoId}\"}.mp4",
+            mimeType = "video/mp4",
+            mediaType = MediaType.VIDEO,
+            quality = com.hitif.videodownloader.model.MediaQuality.UNKNOWN,
+            sizeBytes = -1L,
+            pageUrl = pageUrl,
+            pageTitle = pageTitle ?: "YouTube Video"
+        )
+
+        // Emit through the same callback chain as MediaDetector
+        vm.detector.emitDirect(item)
     }
 
     // ── YouTube URL auto-refresh timer ───────────────────────────────────

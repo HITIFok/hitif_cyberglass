@@ -166,7 +166,9 @@ class MediaPanelFragment : BottomSheetDialogFragment() {
         val renameDialog = RenameDialogFragment.newInstance(item)
         renameDialog.onFilenameConfirmed = { baseName, _ ->
             try {
-                DownloadHelper.enqueue(requireContext(), item, customFilename = baseName)
+                // Pass pageUrl so YouTube downloads can route through InnerTube API
+                val currentPageUrl = vm.pageUrl.value ?: ""
+                DownloadHelper.enqueue(requireContext(), item, customFilename = baseName, pageUrl = currentPageUrl)
                 Toast.makeText(
                     requireContext(),
                     "\u2b07 ${baseName.take(32)}",

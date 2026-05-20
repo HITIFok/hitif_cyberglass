@@ -286,9 +286,29 @@ class MediaDetector(
             return true
         }
 
+        // ── Block GoogleVideo segment URLs ─────────────────────────────
+        // These are session-bound URLs (ip=, sig=, expire= parameters) that
+        // cannot be downloaded directly (403 Forbidden). YouTubeExtractor
+        // handles YouTube downloads via InnerTube API instead.
+        if (isGoogleVideoSegmentUrl(cleanUrl)) {
+            return true
+        }
+
         BLOCKED_HOSTS.forEach { host -> if (cleanUrl.contains(host)) return true }
         SKIP_PATTERNS.forEach { re -> if (re.containsMatchIn(cleanUrl)) return true }
         return false
+    }
+
+    /**
+     * Detects GoogleVideo CDN segment URLs that are session-bound.
+     * These URLs contain parameters like expire=, ip=, sig= that tie them
+     * to the WebView session. Downloading them directly causes 403 Forbidden.
+     * YouTubeExtractor handles YouTube via InnerTube API instead.
+     */
+    private fun isGoogleVideoSegmentUrl(url: String): Boolean {
+        if (!url.contains("googlevideo.com")) return false
+        return url.contains("expire=") ||
+               url.contains("/videoplayback")
     }
 
     private fun looksLikeMedia(url: String): Boolean {
