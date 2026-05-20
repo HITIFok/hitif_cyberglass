@@ -198,13 +198,15 @@ class YouTubeDownloadTask {
                     tempFile.delete()
                 }
 
-                openConnection(url, cookies, rangeStart = startByte).use { (connection, stream) ->
+                // Open connection manually (avoid non-inline use{} lambda so
+                // that continue/return@withContext can cross into the for-loop)
+                val (connection, stream) = openConnection(url, cookies, rangeStart = startByte)
+                try {
                     // First-byte content sniffing: read first 16 bytes to check it's media
                     val firstBytes = ByteArray(16)
                     val bytesRead = stream.read(firstBytes)
                     if (bytesRead > 0) {
                         if (!isMediaContent(firstBytes, bytesRead)) {
-                            connection.disconnect()
                             val errorMsg = buildString {
                                 append("Le serveur retourne du contenu non-media (probablement HTML/JSON erreur). ")
                                 append("URL YouTube probablement expiree. Rechargez la page video et reessayez.")
@@ -254,6 +256,8 @@ class YouTubeDownloadTask {
                             }
                         }
                     }
+                } finally {
+                    try { stream.close() } catch (_: Exception) {}
                     connection.disconnect()
                 }
 
@@ -358,7 +362,8 @@ class YouTubeDownloadTask {
         var downloaded = 0L
 
         file.parentFile?.mkdirs()
-        openConnection(url, cookies).use { (connection, stream) ->
+        val (connection, stream) = openConnection(url, cookies)
+        try {
             // First-byte content sniffing for DASH streams
             val firstBytes = ByteArray(16)
             val bytesRead = stream.read(firstBytes)
@@ -387,6 +392,8 @@ class YouTubeDownloadTask {
                     }
                 }
             }
+        } finally {
+            try { stream.close() } catch (_: Exception) {}
             connection.disconnect()
         }
 
