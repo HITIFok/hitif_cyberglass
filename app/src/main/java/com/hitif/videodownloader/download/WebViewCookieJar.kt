@@ -5,7 +5,6 @@ import android.webkit.CookieManager
 import okhttp3.Cookie
 import okhttp3.HttpUrl
 import okhttp3.CookieJar
-import java.net.URL
 
 
 /**
@@ -70,10 +69,10 @@ class WebViewCookieJar : CookieJar {
                     try {
                         val domainCookies = cookieManager.getCookie(cookieDomain)
                         if (!domainCookies.isNullOrBlank()) {
-                            // Parse and add unique cookies only
-                            val parsed = parseCookies(
-                                HttpUrl.get(URL(cookieDomain)), domainCookies
-                            )
+                            // Parse cookies using the target request URL (already an HttpUrl)
+                            // This avoids needing to parse the domain string — all HttpUrl
+                            // .get/.parse methods are extensions in OkHttp 4.x
+                            val parsed = parseCookies(url, domainCookies)
                             for (cookie in parsed) {
                                 if (cookie.name !in ytCookieNames) {
                                     ytCookieNames.add(cookie.name)
