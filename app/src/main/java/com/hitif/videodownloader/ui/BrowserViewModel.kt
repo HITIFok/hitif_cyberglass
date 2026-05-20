@@ -51,7 +51,17 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
     private var lastMediaBase: String = ""
 
     val detector = MediaDetector { item ->
-        val key = item.url.substringBefore('?')
+        // Dedup key: for YouTube page URLs, include the video ID.
+        // "youtube.com/watch?v=abc" and "youtube.com/watch?v=xyz" must not collide.
+        val key = if (item.url.contains("youtube.com/watch") ||
+                     item.url.contains("youtube.com/shorts/") ||
+                     item.url.contains("youtu.be/")) {
+            val videoIdMatch = Regex("[?&]v=([a-zA-Z0-9_-]{11})").find(item.url)
+            if (videoIdMatch != null) "yt:${videoIdMatch.groupValues[1]}"
+            else item.url.substringBefore('?').substringBefore('#')
+        } else {
+            item.url.substringBefore('?').substringBefore('#')
+        }
         synchronized(_seenUrls) {
             if (_seenUrls.add(key)) {
                 val current = mediaItems.value.orEmpty().toMutableList()

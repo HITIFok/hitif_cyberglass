@@ -224,11 +224,16 @@ class MediaDetector(
      * internal app files from being emitted as YouTube media.
      */
     fun emitDirect(item: MediaItem) {
-        // YouTube items MUST come from googlevideo.com
+        // YouTube-related URLs: allow YouTube PAGE URLs (youtube.com/watch, youtu.be)
+        // and googlevideo.com stream URLs. Block anything else with "youtube" in it
+        // (e.g. internal app resources that happen to match).
         if (item.url.contains("youtube") || item.mimeType.contains("youtube") ||
             item.filename.contains("youtube")) {
-            if (!item.url.contains("googlevideo.com")) {
-                Log.d(TAG, "emitDirect: skipping non-googlevideo URL with YouTube label: ${item.url.take(80)}")
+            val isYoutubePage = item.url.contains("youtube.com/watch") ||
+                                item.url.contains("youtube.com/shorts/") ||
+                                item.url.contains("youtu.be/")
+            if (!isYoutubePage && !item.url.contains("googlevideo.com")) {
+                Log.d(TAG, "emitDirect: skipping non-page non-googlevideo YouTube URL: ${item.url.take(80)}")
                 return
             }
         }
@@ -247,9 +252,33 @@ class MediaDetector(
             return
         }
 
-        val key = item.url.substringBefore('?').substringBefore('#')
+        // Dedup key: for YouTube page URLs, include the video ID (query param)
+        // because "/watch?v=abc" and "/watch?v=xyz" must be treated as different items.
+        // Without this, all YouTube watch URLs share key "https://www.youtube.com/watch"
+        // and only the first video is ever detected.
+        val key = buildDedupKey(item.url)
         if (seen.putIfAbsent(key, true) != null) return
         emit(item)
+    }
+
+    /**
+     * Build a deduplication key that is unique per video for YouTube page URLs.
+     * For YouTube: "https://www.youtube.com/watch?v=abc123" → includes "v=abc123"
+     * For other URLs: standard path-only key (before '?' and '#')
+     */
+    private fun buildDedupKey(url: String): String {
+        if (url.contains("youtube.com/watch") || url.contains("youtube.com/shorts/") ||
+            url.contains("youtu.be/")) {
+            // For YouTube, the video ID is what makes each URL unique.
+            // Include up to the video ID parameter but strip other tracking params.
+            val videoIdMatch = Regex("[?&]v=([a-zA-Z0-9_-]{11})").find(url)
+            if (videoIdMatch != null) {
+                return "yt:${videoIdMatch.groupValues[1]}"
+            }
+            // Shorts or other YouTube URLs: use the full path up to '?'
+            return url.substringBefore('?').substringBefore('#')
+        }
+        return url.substringBefore('?').substringBefore('#')
     }
 
     /**
