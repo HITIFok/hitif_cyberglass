@@ -3,34 +3,29 @@ package com.hitif.videodownloader.download
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLDecoder
 import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 
 /**
  * YouTubeExtractor — Extraction des streams YouTube via l'API InnerTube.
  *
- * STRATEGIE MULTI-CLIENT (ordre de priorité) :
- * ─────────────────────────────────────────────────────────────────────────
- * 1. TV_EMBEDDED  (clientId=85) — Pas de PO token requis. Le plus fiable
- *    depuis que YouTube exige le PO token pour WEB/ANDROID (fin 2024).
- *    Fonctionne pour toutes les vidéos publiques sans authentification.
+ * utilise OkHttp au lieu de HttpURLConnection pour:
+ * - Meilleure empreinte TLS (non detectable comme bot par YouTube)
+ * - Forwarding automatique des cookies via WebViewCookieJar
+ * - Gestion correcte des redirections
+ * - Connection pooling
  *
- * 2. IOS          (clientId=5)  — Fallback fiable. Pas de PO token.
- *    Retourne des URLs directes sans déchiffrement JS.
- *
- * 3. ANDROID      (clientId=3)  — Fallback. Peut échouer si PO token requis.
- *
- * 4. WEB + sapisidhash — Si cookies SAPISID disponibles (utilisateur connecté).
- *    Meilleure compatibilité vidéos age-restreintes.
- *
- * POURQUOI LES ANCIENNES VERSIONS ÉCHOUAIENT :
- * ─────────────────────────────────────────────────────────────────────────
- * YouTube a introduit le "Proof of Origin" token mi-2024. Sans lui,
- * WEB/ANDROID retournent playabilityStatus=LOGIN_REQUIRED ou streamingData=null.
- * TV_EMBEDDED et IOS sont exemptés de cette exigence.
+ * STRATEGIE MULTI-CLIENT (ordre de priorite):
+ * 1. TV_EMBEDDED  (clientId=85) — Pas de PO token requis. Le plus fiable.
+ * 2. IOS          (clientId=5)  — Fallback. Pas de PO token. URLs directes.
+ * 3. ANDROID      (clientId=3)  — Fallback. Peut echouer si PO token requis.
+ * 4. WEB + sapisidhash — Si cookies SAPISID disponibles.
  */
 class YouTubeExtractor {
 
@@ -41,31 +36,45 @@ class YouTubeExtractor {
         private const val ORIGIN = "https://www.youtube.com"
 
         // ── Client TV Embedded (PRIMAIRE — pas de PO token) ─────────────────
-        // Version identique a yt-dlp (exemptee du PO Token par YouTube)
-        private const val TV_EMBED_VERSION = "7.20231219"
+        // Version mise a jour (l'ancienne 7.20231219 est depreciee par YouTube)
+        private const val TV_EMBED_VERSION = "7.20250409"
 
         // ── Client iOS (SECONDAIRE — pas de PO token) ────────────────────────
-        private const val IOS_VERSION = "19.45.4"
+        private const val IOS_VERSION = "20.16.7"
         private const val IOS_DEVICE  = "iPhone16,2"
         private const val IOS_UA      =
-            "com.google.ios.youtube/$IOS_VERSION (iPhone16,2; U; CPU iOS 18_1_0 like Mac OS X)"
+            "com.google.ios.youtube/$IOS_VERSION (iPhone16,2; U; CPU iOS 18_5_0 like Mac OS X)"
 
         // ── Client ANDROID (FALLBACK) ─────────────────────────────────────────
-        private const val ANDROID_VERSION = "19.45.36"
+        private const val ANDROID_VERSION = "20.16.7"
         private const val ANDROID_UA      =
             "com.google.android.youtube/$ANDROID_VERSION " +
-            "(Linux; U; Android 14; en_US) gzip"
+            "(Linux; U; Android 15; en_US) gzip"
 
         // ── Client WEB (DERNIER RECOURS avec sapisidhash) ─────────────────────
         private const val WEB_VERSION = "2.20250513.00.00"
         private const val WEB_UA =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
-            "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            "(KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
 
         // ── Enum des clients disponibles ──────────────────────────────────────
         enum class Client { TV_EMBEDDED, IOS, ANDROID, WEB }
 
-        // ── Corps de requête InnerTube par client ─────────────────────────────
+        // ── OkHttp client (singleton) ─────────────────────────────────────────
+        // Utilise WebViewCookieJar pour forwarder les cookies du WebView
+        // vers les requetes InnerTube API.
+        private val httpClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .cookieJar(WebViewCookieJar())
+                .connectTimeout(15, TimeUnit.SECONDS)
+                .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(15, TimeUnit.SECONDS)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .build()
+        }
+
+        // ── Corps de requete InnerTube par client ─────────────────────────────
 
         private fun buildBody(videoId: String, client: Client, sapisid: String? = null): String =
             when (client) {
@@ -76,6 +85,7 @@ class YouTubeExtractor {
                         "client": {
                           "clientName": "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
                           "clientVersion": "$TV_EMBED_VERSION",
+                          "clientScreen": "EMBED",
                           "hl": "en",
                           "gl": "US",
                           "utcOffsetMinutes": 0
@@ -98,7 +108,7 @@ class YouTubeExtractor {
                           "clientVersion": "$IOS_VERSION",
                           "deviceModel": "$IOS_DEVICE",
                           "osName": "iPhone",
-                          "osVersion": "18.1.0.22B83",
+                          "osVersion": "18.5.0",
                           "hl": "en",
                           "gl": "US",
                           "utcOffsetMinutes": 0,
@@ -117,9 +127,9 @@ class YouTubeExtractor {
                         "client": {
                           "clientName": "ANDROID",
                           "clientVersion": "$ANDROID_VERSION",
-                          "androidSdkVersion": 34,
+                          "androidSdkVersion": 35,
                           "osName": "Android",
-                          "osVersion": "14.0",
+                          "osVersion": "15",
                           "hl": "en",
                           "gl": "US",
                           "utcOffsetMinutes": 0,
@@ -156,9 +166,12 @@ class YouTubeExtractor {
             buildMap {
                 put("Content-Type",             "application/json; charset=UTF-8")
                 put("Accept-Language",          "en-US,en;q=0.9")
-                put("Origin",                   ORIGIN)
-                put("Referer",                  "$ORIGIN/")
                 put("X-Goog-Api-Format-Version","1")
+                // Ne PAS mettre Origin/Referer pour TV_EMBEDDED (embed context)
+                if (client != Client.TV_EMBEDDED) {
+                    put("Origin",  ORIGIN)
+                    put("Referer", "$ORIGIN/")
+                }
                 when (client) {
                     Client.TV_EMBEDDED -> {
                         put("User-Agent",               WEB_UA)
@@ -234,7 +247,7 @@ class YouTubeExtractor {
             url.contains("googlevideo.com") || url.contains("/videoplayback")
     }
 
-    // ── Data classes (inchangés) ──────────────────────────────────────────────
+    // ── Data classes ──────────────────────────────────────────────────────────
 
     data class YouTubeStream(
         val url: String,
@@ -309,7 +322,7 @@ class YouTubeExtractor {
 
     /**
      * Extrait les streams pour une URL YouTube.
-     * Essaie les clients dans l'ordre : TV_EMBEDDED → IOS → ANDROID → WEB.
+     * Essaie les clients dans l'ordre : TV_EMBEDDED -> IOS -> ANDROID -> WEB.
      */
     suspend fun extract(
         youtubeUrl: String,
@@ -319,36 +332,35 @@ class YouTubeExtractor {
         val videoId = extractVideoId(youtubeUrl)
             ?: extractVideoId(pageUrl ?: "")
             ?: run {
-                Log.e(TAG, "Impossible d'extraire l'ID vidéo: $youtubeUrl")
+                Log.e(TAG, "Impossible d'extraire l'ID video: youtubeUrl=$youtubeUrl pageUrl=$pageUrl")
                 return@withContext null
             }
-        Log.d(TAG, "InnerTube extraction pour videoId=$videoId")
+        Log.d(TAG, "=== InnerTube extraction pour videoId=$videoId ===")
+        Log.d(TAG, "  youtubeUrl=$youtubeUrl")
+        Log.d(TAG, "  pageUrl=$pageUrl")
+        Log.d(TAG, "  cookies=${cookies?.take(80)}...")
 
         val sapisid = extractSapisid(cookies)
+        Log.d(TAG, "  sapisid=${if (sapisid != null) "present (${sapisid.take(6)}...)" else "absent"}")
 
-        // ── Ordre de priorité des clients ─────────────────────────────────────
-        // 1. TV_EMBEDDED — pas de PO token requis (le plus fiable post-2024)
-        Log.d(TAG, "[$videoId] Essai client TV_EMBEDDED...")
-        callApi(videoId, Client.TV_EMBEDDED, null)?.let { return@withContext it }
+        // ── Ordre de priorite des clients ─────────────────────────────────────
+        for (client in listOf(Client.TV_EMBEDDED, Client.IOS, Client.ANDROID, Client.WEB)) {
+            // WEB necessite sapisidhash
+            if (client == Client.WEB && sapisid == null) {
+                Log.d(TAG, "[$videoId] WEB saute (pas de SAPISID)")
+                continue
+            }
 
-        // 2. IOS — pas de PO token requis
-        Log.d(TAG, "[$videoId] TV_EMBEDDED échec → essai client IOS...")
-        callApi(videoId, Client.IOS, null)?.let { return@withContext it }
-
-        // 3. ANDROID — peut échouer sans PO token mais vaut le coup
-        Log.d(TAG, "[$videoId] IOS échec → essai client ANDROID...")
-        callApi(videoId, Client.ANDROID, null)?.let { return@withContext it }
-
-        // 4. WEB + sapisidhash (si utilisateur connecté à YouTube dans le WebView)
-        if (sapisid != null) {
-            Log.d(TAG, "[$videoId] ANDROID échec → essai WEB + sapisidhash...")
-            callApi(videoId, Client.WEB, sapisid)?.let { return@withContext it }
-        } else {
-            Log.d(TAG, "[$videoId] ANDROID échec → essai WEB (sans auth)...")
-            callApi(videoId, Client.WEB, null)?.let { return@withContext it }
+            Log.d(TAG, "[$videoId] Essai client $client...")
+            val result = callApi(videoId, client, if (client == Client.WEB) sapisid else null)
+            if (result != null) {
+                Log.d(TAG, "[$videoId] SUCCES avec $client")
+                return@withContext result
+            }
+            Log.d(TAG, "[$videoId] ECHEC avec $client, essai client suivant...")
         }
 
-        Log.e(TAG, "[$videoId] Tous les clients ont échoué.")
+        Log.e(TAG, "[$videoId] TOUS les clients ont echoue.")
         null
     }
 
@@ -359,53 +371,51 @@ class YouTubeExtractor {
                 ?: callApi(videoId, Client.ANDROID, null)
         }
 
-    // ── Appel InnerTube API ───────────────────────────────────────────────────
+    // ── Appel InnerTube API via OkHttp ───────────────────────────────────────
 
     private fun callApi(
         videoId: String,
         client: Client,
         sapisid: String?
     ): ExtractionResult? {
-        val connection: HttpURLConnection = try {
-            URL(INNERTUBE_URL).openConnection() as HttpURLConnection
-        } catch (e: Exception) {
-            Log.e(TAG, "[$client] Connexion impossible: ${e.message}")
-            return null
-        }
+        val jsonBody = buildBody(videoId, client, sapisid)
+        val headers = buildHeaders(client, sapisid)
+
+        Log.d(TAG, "[$client][$videoId] Requete vers InnerTube API...")
+        Log.d(TAG, "[$client][$videoId] Body: ${jsonBody.take(300)}...")
+
+        val request = Request.Builder()
+            .url(INNERTUBE_URL)
+            .post(jsonBody.toRequestBody("application/json; charset=UTF-8".toMediaType()))
+            .apply {
+                headers.forEach { (k, v) -> addHeader(k, v) }
+            }
+            .build()
 
         return try {
-            connection.apply {
-                requestMethod = "POST"
-                connectTimeout = 15_000
-                readTimeout   = 30_000
-                doOutput      = true
-                instanceFollowRedirects = false
-                buildHeaders(client, sapisid).forEach { (k, v) -> setRequestProperty(k, v) }
-            }
+            val response = httpClient.newCall(request).execute()
+            val code = response.code
+            val responseBody = response.body?.string() ?: ""
 
-            val body = buildBody(videoId, client, sapisid).toByteArray(Charsets.UTF_8)
-            connection.outputStream.use { it.write(body) }
+            Log.d(TAG, "[$client][$videoId] HTTP $code | Body length=${responseBody.length}")
 
-            val code = connection.responseCode
             if (code != 200) {
-                val err = connection.errorStream?.bufferedReader()?.readText()?.take(200)
-                Log.w(TAG, "[$client] HTTP $code pour $videoId: $err")
-                connection.disconnect()
+                Log.e(TAG, "[$client][$videoId] HTTP ERROR $code: ${responseBody.take(500)}")
                 return null
             }
 
-            val response = connection.inputStream.bufferedReader().readText()
-            connection.disconnect()
-            parseResponse(videoId, response, client)
+            // Log la reponse (premiers 500 chars pour debug)
+            Log.d(TAG, "[$client][$videoId] Response: ${responseBody.take(500)}")
+
+            parseResponse(videoId, responseBody, client)
 
         } catch (e: Exception) {
-            Log.e(TAG, "[$client] Exception: ${e.message}", e)
-            connection.disconnect()
+            Log.e(TAG, "[$client][$videoId] EXCEPTION: ${e.javaClass.simpleName}: ${e.message}", e)
             null
         }
     }
 
-    // ── Parsing de la réponse ─────────────────────────────────────────────────
+    // ── Parsing de la reponse ─────────────────────────────────────────────────
 
     private fun parseResponse(
         videoId: String,
@@ -417,39 +427,62 @@ class YouTubeExtractor {
 
             val playability = root.optJSONObject("playabilityStatus")
             val status = playability?.optString("status")
+            val reason = playability?.optString("reason", "")
+
+            Log.d(TAG, "[$client][$videoId] playabilityStatus=$status reason=$reason")
 
             when (status) {
                 "ERROR" -> {
-                    val reason = playability.optString("reason")
                     Log.e(TAG, "[$client][$videoId] ERROR: $reason")
                     return null
                 }
                 "LOGIN_REQUIRED" -> {
-                    val msg = playability.optJSONArray("messages")?.optString(0) ?: ""
+                    val messages = playability?.optJSONArray("messages")
+                    val msg = messages?.let { arr ->
+                        (0 until arr.length()).mapNotNull { arr.optString(it) }.joinToString("; ")
+                    } ?: ""
                     Log.w(TAG, "[$client][$videoId] LOGIN_REQUIRED: $msg")
-                    // Ne pas retourner null immédiatement — essayer les autres clients
                     return null
                 }
                 "UNPLAYABLE" -> {
-                    val reason = playability.optString("reason")
-                    Log.w(TAG, "[$client][$videoId] UNPLAYABLE: $reason")
+                    val messages = playability?.optJSONArray("messages")
+                    val msg = messages?.let { arr ->
+                        (0 until arr.length()).mapNotNull { arr.optString(it) }.joinToString("; ")
+                    } ?: reason
+                    Log.w(TAG, "[$client][$videoId] UNPLAYABLE: $msg")
+                    return null
+                }
+                "AGE_CHECK_REQUIRED" -> {
+                    Log.w(TAG, "[$client][$videoId] AGE_CHECK_REQUIRED")
+                    return null
+                }
+                "CONTENT_CHECK_REQUIRED" -> {
+                    Log.w(TAG, "[$client][$videoId] CONTENT_CHECK_REQUIRED")
+                    return null
+                }
+                "LIVE_STREAM_OFFLINE", "LIVE_STREAM_UNAVAILABLE" -> {
+                    Log.w(TAG, "[$client][$videoId] $status: $reason")
                     return null
                 }
                 null, "OK" -> { /* continuer */ }
-                else -> Log.w(TAG, "[$client][$videoId] Status inattendu: $status")
+                else -> {
+                    Log.w(TAG, "[$client][$videoId] Status inattendu: $status — on continue quand meme")
+                }
             }
 
             val videoDetails = root.optJSONObject("videoDetails")
             val title = videoDetails?.optString("title") ?: "YouTube_$videoId"
             val duration = videoDetails?.optString("lengthSeconds")?.toLongOrNull() ?: 0L
+            val isLive = videoDetails?.optBoolean("isLive", false) == true
             val thumbs = videoDetails?.optJSONObject("thumbnail")?.optJSONArray("thumbnails")
             val thumbnail = if (thumbs != null && thumbs.length() > 0)
                 thumbs.getJSONObject(thumbs.length() - 1).optString("url") else ""
 
+            Log.d(TAG, "[$client][$videoId] Title=\"$title\" duration=${duration}s isLive=$isLive")
+
             val streamingData = root.optJSONObject("streamingData")
             if (streamingData == null) {
-                val isLive = videoDetails?.optBoolean("isLive", false) == true
-                Log.w(TAG, "[$client][$videoId] streamingData=null (isLive=$isLive, status=$status)")
+                Log.w(TAG, "[$client][$videoId] streamingData=null (status=$status)")
                 return null
             }
 
@@ -475,13 +508,27 @@ class YouTubeExtractor {
                 }
             }
 
-            // Si aucun format muxé ET pas de DASH ET pas de HLS → échec
+            Log.d(TAG, "[$client][$videoId] Formats trouves: muxed=${muxed.size} videoOnly=${videoOnly.size} audioOnly=${audioOnly.size} hls=${hlsUrl != null}")
+
+            // Si aucun format muxe ET pas de video ET pas de HLS -> echec
             if (muxed.isEmpty() && videoOnly.isEmpty() && hlsUrl == null) {
-                Log.w(TAG, "[$client][$videoId] Aucun format disponible dans streamingData")
-                return null
+                // Pour les lives, HLS peut etre le seul format
+                if (isLive && hlsUrl != null) {
+                    // OK pour un live
+                } else {
+                    Log.w(TAG, "[$client][$videoId] Aucun format disponible dans streamingData")
+                    // Log le streamingData pour debug
+                    Log.d(TAG, "[$client][$videoId] streamingData brut: ${streamingData.toString().take(800)}")
+                    return null
+                }
             }
 
-            Log.d(TAG, "[$client][$videoId] OK: \"$title\" | " +
+            // Si on a de la video adaptive mais pas d'audio -> essayer de trouver du muxed
+            if (muxed.isEmpty() && videoOnly.isNotEmpty() && audioOnly.isEmpty()) {
+                Log.w(TAG, "[$client][$videoId] Video adaptive sans audio — le muxed est absent, on continue avec ce qu'on a")
+            }
+
+            Log.d(TAG, "[$client][$videoId] EXTRACTION OK: \"$title\" | " +
                 "muxed=${muxed.size} video=${videoOnly.size} audio=${audioOnly.size}")
 
             ExtractionResult(
@@ -492,7 +539,7 @@ class YouTubeExtractor {
                 hlsManifestUrl   = hlsUrl
             )
         } catch (e: Exception) {
-            Log.e(TAG, "[$client] Parsing erreur: ${e.message}", e)
+            Log.e(TAG, "[$client][$videoId] Parsing erreur: ${e.javaClass.simpleName}: ${e.message}", e)
             null
         }
     }
@@ -543,7 +590,10 @@ class YouTubeExtractor {
             val base = params["url"] ?: return null
             buildString {
                 append(base)
+                // sig = signature deja decodee
                 params["sig"]?.let { append("&").append(params["sp"] ?: "signature").append("=").append(it) }
+                // s = signature obfusquee (necessite decode JS — on ne peut pas la decoder ici)
+                // On l'ajoute quand meme au cas ou elle passe directement
                 params["s"]?.let   { append("&").append(params["sp"] ?: "signature").append("=").append(it) }
                 params["n"]?.let   { append("&n=").append(it) }
                 params["dn"]?.let  { append("&dn=").append(it) }
