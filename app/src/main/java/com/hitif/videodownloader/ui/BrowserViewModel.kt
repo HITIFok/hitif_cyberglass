@@ -12,6 +12,7 @@ import com.hitif.videodownloader.model.MediaType
 import com.hitif.videodownloader.network.MediaDetector
 import com.hitif.videodownloader.network.SmartNaming
 import com.hitif.videodownloader.download.DownloadNotificationManager
+import com.hitif.videodownloader.download.YouTubeExtractor
 import androidx.lifecycle.MutableLiveData
 import kotlinx.coroutines.launch
 
@@ -66,7 +67,10 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
             if (_seenUrls.add(key)) {
                 val current = mediaItems.value.orEmpty().toMutableList()
                 current.add(0, item)
-                mediaItems.postValue(current)
+                // Use setValue (synchronous) instead of postValue (async) to prevent
+                // race conditions with clearMedia()'s setValue(emptyList).
+                // postValue can be silently dropped if a setValue follows before delivery.
+                mediaItems.value = current
                 recomputeSeasonGroups(current)
             }
         }
@@ -83,18 +87,52 @@ class BrowserViewModel(app: Application) : AndroidViewModel(app) {
      * a DIFFERENT series/site. Keeps media when navigating between episodes
      * of the same anime (same base path).
      *
+     * IMPORTANT — YouTube subdomain protection:
+     * YouTube navigates between subdomains during the same session:
+     *   www.youtube.com → consent.youtube.com → accounts.youtube.com → www.youtube.com
+     * Without protection, clearMedia() would wipe the detected YouTube video item
+     * during these intermediate redirects. We preserve YouTube page URL items
+     * across subdomain changes to prevent this.
+     *
      * Example:
-     *  episode-1.html → episode-2.html  → KEEP media (same base)
-     *  episode-2.html → google.com       → CLEAR media (different base)
+     *  episode-1.html → episode-2.html        → KEEP media (same base)
+     *  episode-2.html → google.com              → CLEAR media (different base)
+     *  youtube.com/watch → consent.youtube.com  → KEEP YouTube items (subdomain change)
      */
     fun clearMediaIfNeeded(url: String) {
         val newBase = extractSeriesBase(url)
         if (newBase != lastMediaBase && lastMediaBase.isNotEmpty()) {
+            // Check if both URLs are YouTube subdomains — don't clear in that case
+            if (isYouTubeSubdomainNavigation(newBase, lastMediaBase)) {
+                return
+            }
             // Navigating to a different series/site — clear everything
             clearMedia()
         }
         // Update base even if we didn't clear — next navigation will compare against this
         // (we set it after onPageFinished so the current page's media gets detected first)
+    }
+
+    /**
+     * Detect if a navigation between two series bases is just a YouTube subdomain
+     * change (e.g. www.youtube.com → consent.youtube.com → accounts.youtube.com).
+     * These should NOT trigger clearMedia() because the YouTube video item would be lost.
+     */
+    private fun isYouTubeSubdomainNavigation(newBase: String, oldBase: String): Boolean {
+        val newYt = isYouTubeHost(newBase)
+        val oldYt = isYouTubeHost(oldBase)
+        return newYt && oldYt
+    }
+
+    private fun isYouTubeHost(base: String): Boolean {
+        val ytHosts = listOf(
+            "youtube.com", "youtu.be",
+            "www.youtube.com", "m.youtube.com",
+            "consent.youtube.com", "accounts.youtube.com",
+            "music.youtube.com", "studio.youtube.com"
+        )
+        val host = base.substringBefore('/')
+        return ytHosts.any { host.contains(it) || it.contains(host) }
     }
 
     /** Call this from onPageFinished so the base is set AFTER media detection starts */
