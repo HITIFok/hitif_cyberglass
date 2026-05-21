@@ -9,90 +9,126 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
-import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.URL
+import java.util.concurrent.TimeUnit
 
 /**
- * YouTubeDownloadTask — Telechargement robuste des videos YouTube.
+ * YouTubeDownloadTask — Telechargement robuste des videos YouTube via OkHttp.
  *
- * CORRECTIONS V2 (403 Forbidden) :
- * ─────────────────────────────────────────────────────────────────────────
- * 1. PLUS de requete HEAD — googlevideo.com rejette les HEAD avec 403.
- *    La taille est lue depuis le header Content-Length de la reponse GET,
- *    ou depuis YouTubeStream.contentLength (de l'extraction InnerTube).
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * CORRECTION DEFINITIVE V3 (403 Forbidden) :
+ * ═══════════════════════════════════════════════════════════════════════════════
  *
- * 2. Cookies conditionnels — Les streams extraits par TV_EMBEDDED/IOS/ANDROID
- *    utilisent cleanClient (sans cookies). Envoyer des cookies au telechargement
- *    cree une incoherence detectee par YouTube → 403.
- *    - usedSessionClient=false → PAS de cookies (TV_EMBEDDED, IOS, ANDROID)
- *    - usedSessionClient=true  → cookies WebView (WEB uniquement)
+ * CAUSE RACINE DU 403 :
+ * L'ancienne version utilisait java.net.HttpURLConnection pour le telechargement.
+ * HttpURLConnection (Android) est un vieux wrapper autour d'une ancienne version
+ * interne d'OkHttp, avec un fingerprint TLS/HTTP2 different d'OkHttp moderne.
+ * googlevideo.com detecte cette difference entre l'extraction (OkHttp moderne)
+ * et le telechargement (HttpURLConnection) → rejet 403.
  *
- * 3. Headers adaptes au client — Les headers Sec-Fetch-* sont Chrome-only.
- *    Envoyes uniquement avec un UA navigateur (WEB_UA).
- *    Les UAs app (IOS/ANDROID) ne recoivent que les headers minimaux.
+ * CORRECTION :
+ * - Remplacement TOTAL de HttpURLConnection par OkHttp pour le telechargement.
+ * - cleanDownloadClient (sans cookies) pour TV_EMBEDDED/IOS/ANDROID.
+ * - sessionDownloadClient (avec WebViewCookieJar) pour WEB uniquement.
+ * - Meme stack HTTP entre extraction et telechargement → meme fingerprint TLS.
  *
- * 4. User-Agent continuite — Le meme UA utilise lors de l'extraction InnerTube
- *    est utilise pour le telechargement googlevideo.com (via YouTubeStream.userAgent).
- *
- * Architecture : HttpURLConnection avec gestion manuelle des redirections,
- * support de la reprise (Range), content-sniffing, et fusion DASH via MediaMuxer.
+ * Autres corrections maintenues (V2) :
+ * - PAS de requete HEAD avant le telechargement.
+ * - Cookies conditionnels (uniquement si extraction avec sessionClient).
+ * - Headers adaptes au client (Sec-Fetch-* uniquement avec UA navigateur).
+ * - User-Agent identique entre extraction et telechargement.
+ * ═══════════════════════════════════════════════════════════════════════════════
  */
 class YouTubeDownloadTask {
 
     companion object {
         private const val TAG = "YTDownloadTask"
         private const val BUFFER_SIZE = 128 * 1024
-        private const val MAX_REDIRECTS = 5
 
         private const val MAX_DOWNLOAD_ATTEMPTS = 3
         private const val RETRY_DELAY_MS = 2_000L
+
+        // ── Clients OkHttp pour le telechargement ────────────────────────────
+        // Meme stack HTTP que YouTubeExtractor → fingerprint TLS identique.
+
+        /** Client SANS cookies — pour les streams extraits par TV_EMBEDDED/IOS/ANDROID.
+         *  CRITIQUE : ne JAMAIS envoyer de cookies avec ces streams. */
+        private val cleanDownloadClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(120, TimeUnit.SECONDS)
+                .writeTimeout(15, TimeUnit.SECONDS)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .build()
+        }
+
+        /** Client AVEC cookies — pour les streams extraits par WEB (sessionClient).
+         *  Utilise WebViewCookieJar pour transmettre les cookies YouTube. */
+        private val sessionDownloadClient: OkHttpClient by lazy {
+            OkHttpClient.Builder()
+                .cookieJar(WebViewCookieJar())
+                .connectTimeout(20, TimeUnit.SECONDS)
+                .readTimeout(120, TimeUnit.SECONDS)
+                .writeTimeout(15, TimeUnit.SECONDS)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .build()
+        }
 
         /** Detecte si un UA est un UA navigateur (Chrome) ou une app native */
         private fun isBrowserUserAgent(ua: String): Boolean =
             ua.contains("Mozilla/") || ua.contains("Gecko/") || ua.contains("Chrome/")
 
         /**
-         * Construit les headers de telechargement adaptes au client.
+         * Construit un OkHttp Request.Builder avec les headers adaptes au client.
          *
          * - UA navigateur (WEB/TV_EMBEDDED) → headers complets avec Sec-Fetch-*
-         * - UA app native (IOS/ANDROID) → headers minimaux (pas de Sec-Fetch-*)
+         * - UA app native (IOS/ANDROID) → headers minimaux
          *
-         * @param sendCookies true uniquement si l'extraction a utilise sessionClient (WEB).
-         *                    false pour TV_EMBEDDED/IOS/ANDROID (cleanClient, sans cookies).
+         * @param sendCookies true uniquement si sessionDownloadClient est utilise (WEB).
          */
-        private fun buildDownloadHeaders(
-            cookies: String?,
-            userAgent: String? = null,
-            sendCookies: Boolean = false
-        ): Map<String, String> {
-            val ua = userAgent ?: "com.google.android.youtube/19.29.37 (Linux; U; Android 11; en_US) gzip"
+        private fun buildDownloadRequest(
+            url: String,
+            userAgent: String?,
+            sendCookies: Boolean = false,
+            rangeStart: Long = 0L
+        ): Request.Builder {
+            val ua = userAgent
+                ?: "com.google.android.youtube/19.29.37 (Linux; U; Android 11; en_US) gzip"
             val isBrowser = isBrowserUserAgent(ua)
 
-            val headers = mutableMapOf<String, String>()
-            headers["User-Agent"] = ua
-            headers["Accept"] = "*/*"
-            headers["Accept-Language"] = "en-US,en;q=0.9"
-            headers["Accept-Encoding"] = "identity"
-            headers["Connection"] = "keep-alive"
+            val builder = Request.Builder()
+                .url(url)
+                .get()
+                .header("User-Agent", ua)
+                .header("Accept", "*/*")
+                .header("Accept-Language", "en-US,en;q=0.9")
+                .header("Accept-Encoding", "identity")
+                .header("Connection", "keep-alive")
 
-            // Les headers navigateur ne sont envoyes qu'avec un UA Chrome
+            // Headers navigateur uniquement avec un UA Chrome
             if (isBrowser) {
-                headers["Origin"] = "https://www.youtube.com"
-                headers["Referer"] = "https://www.youtube.com/"
-                headers["Sec-Fetch-Dest"] = "video"
-                headers["Sec-Fetch-Mode"] = "no-cors"
-                headers["Sec-Fetch-Site"] = "cross-site"
+                builder.header("Origin", "https://www.youtube.com")
+                builder.header("Referer", "https://www.youtube.com/")
+                builder.header("Sec-Fetch-Dest", "video")
+                builder.header("Sec-Fetch-Mode", "no-cors")
+                builder.header("Sec-Fetch-Site", "cross-site")
             }
 
-            // Cookies : UNIQUEMENT si l'extraction a utilise sessionClient
-            if (sendCookies && !cookies.isNullOrEmpty()) {
-                headers["Cookie"] = cookies
+            // Range header pour la reprise
+            if (rangeStart > 0) {
+                builder.header("Range", "bytes=$rangeStart-")
             }
 
-            return headers
+            // NE PAS mettre de header Cookie manuellement quand on utilise
+            // sessionDownloadClient — WebViewCookieJar s'en charge via OkHttp.
+            // Et avec cleanDownloadClient, on ne veut AUCUN cookie.
+
+            return builder
         }
 
         /**
@@ -144,12 +180,10 @@ class YouTubeDownloadTask {
         fun validateDownloadedFile(file: File): Boolean {
             if (!file.exists()) return false
             val fileSize = file.length()
-            // Very small files (< 10KB) from YouTube are likely error responses
             if (fileSize < 10_240) {
                 Log.w(TAG, "Validation: file suspiciously small (${fileSize}B) — checking content")
                 return isMediaContent(file.readBytes(), fileSize.toInt())
             }
-            // For larger files, check magic bytes
             try {
                 val header = ByteArray(16)
                 file.inputStream().use { input ->
@@ -158,7 +192,7 @@ class YouTubeDownloadTask {
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Validation: read error: ${e.message}")
-                return true // Don't fail on read error
+                return true
             }
         }
     }
@@ -171,10 +205,7 @@ class YouTubeDownloadTask {
     }
 
     /**
-     * Telecharge une video YouTube avec la strategie optimale.
-     *
-     * @param result ExtractionResult contenant les streams et les metadonnees du client.
-     *               result.usedSessionClient determine si les cookies doivent etre envoyes.
+     * Telecharge une video YouTube avec la strategie optimale via OkHttp.
      */
     suspend fun download(
         context: Context,
@@ -185,24 +216,21 @@ class YouTubeDownloadTask {
         userAgent: String? = null,
         callback: ProgressCallback
     ) = withContext(Dispatchers.IO) {
-        // CRITIQUE : ne recuperer les cookies QUE si l'extraction a utilise sessionClient.
-        // Les extractions cleanClient (TV_EMBEDDED/IOS/ANDROID) ne doivent PAS envoyer
-        // de cookies au telechargement — cela provoquerait un 403.
-        val cookies: String? = if (result.usedSessionClient) getYouTubeCookies() else null
+        // Choisir le client OkHttp : session uniquement pour WEB, clean pour les autres
+        val useSession = result.usedSessionClient
         Log.d(TAG, "Client extraction: ${result.extractedWithClient} | " +
-            "Session client: ${result.usedSessionClient} | " +
-            "Cookies envoys: ${!cookies.isNullOrEmpty()}")
+            "Session download: $useSession")
 
         when (val strategy = result.selectBestForDownload(preferHighQuality)) {
             is YouTubeExtractor.DownloadStrategy.Muxed -> {
                 Log.d(TAG, "Strategie: MUXED — ${strategy.stream.qualityLabel} (${strategy.stream.fileExtension})")
                 val file = File(outputDir, "$fileName.${strategy.stream.fileExtension}")
                 downloadSingleStream(
+                    httpClient = if (useSession) sessionDownloadClient else cleanDownloadClient,
                     url = strategy.stream.url,
                     outputFile = file,
-                    cookies = cookies,
                     userAgent = strategy.stream.userAgent,
-                    sendCookies = result.usedSessionClient,
+                    sendCookies = useSession,
                     knownContentLength = strategy.stream.contentLength,
                     callback = callback
                 )
@@ -211,12 +239,12 @@ class YouTubeDownloadTask {
             is YouTubeExtractor.DownloadStrategy.Adaptive -> {
                 Log.d(TAG, "Strategie: DASH — video=${strategy.video.qualityLabel} + audio")
                 downloadAndMergeDash(
+                    httpClient = if (useSession) sessionDownloadClient else cleanDownloadClient,
                     video = strategy.video,
                     audio = strategy.audio,
                     outputDir = outputDir,
                     fileName = fileName,
-                    cookies = cookies,
-                    sendCookies = result.usedSessionClient,
+                    sendCookies = useSession,
                     callback = callback
                 )
             }
@@ -232,10 +260,12 @@ class YouTubeDownloadTask {
         }
     }
 
+    // ── Download single stream (muxed) ─────────────────────────────────────
+
     private suspend fun downloadSingleStream(
+        httpClient: OkHttpClient,
         url: String,
         outputFile: File,
-        cookies: String?,
         userAgent: String?,
         sendCookies: Boolean,
         knownContentLength: Long = -1L,
@@ -265,31 +295,68 @@ class YouTubeDownloadTask {
                     tempFile.delete()
                 }
 
-                // Connexion GET — PAS de HEAD avant ! googlevideo.com rejette les HEAD.
-                val (connection, stream, contentLengthFromServer) = openConnection(
-                    url = url,
-                    cookies = cookies,
-                    userAgent = userAgent,
-                    sendCookies = sendCookies,
-                    rangeStart = startByte
-                )
+                // Construire et executer la requete OkHttp
+                val request = buildDownloadRequest(url, userAgent, sendCookies, rangeStart = startByte)
+                    .build()
 
-                // Utiliser la taille du serveur si disponible, sinon la taille connue de l'extraction
+                val response = httpClient.newCall(request).execute()
+                val code = response.code
+                val contentType = response.body?.contentType()?.toString() ?: ""
+                val contentLengthFromServer = response.body?.contentLength() ?: -1L
+
+                Log.d(TAG, "OkHttp HTTP $code (Content-Type: $contentType, CL: $contentLengthFromServer) pour: ${url.take(100)}...")
+
+                when {
+                    code == 200 || code == 206 -> {
+                        // OK
+                    }
+                    code == 403 -> {
+                        val errorBody = response.body?.string()?.take(300)
+                        response.close()
+                        throw Exception("HTTP 403 Forbidden — URL expiree ou acces refuse. " +
+                            "Rechargez la page video YouTube et reessayez. Detail: $errorBody")
+                    }
+                    code in 300..399 -> {
+                        val errorBody = response.body?.string()?.take(200)
+                        response.close()
+                        throw Exception("Redirection inattendue HTTP $code. Detail: $errorBody")
+                    }
+                    else -> {
+                        val errorBody = response.body?.string()?.take(200)
+                        response.close()
+                        throw Exception("HTTP $code inattendu. Detail: $errorBody")
+                    }
+                }
+
+                // Calculer la taille totale
                 if (contentLengthFromServer > 0) {
-                    totalBytes = if (startByte > 0) {
-                        // Serveur a repondu 206 Partial Content — contentLength est la taille restante
+                    totalBytes = if (code == 206 && startByte > 0) {
                         startByte + contentLengthFromServer
                     } else {
                         contentLengthFromServer
                     }
                 }
 
-                Log.d(TAG, "Telechargement: totalBytes=$totalBytes startByte=$startByte")
+                Log.d(TAG, "Telechargement: totalBytes=$totalBytes startByte=$startByte code=$code")
+
+                // Valider le Content-Type
+                val ctLower = contentType.lowercase()
+                if (ctLower.contains("text/html") || ctLower.contains("application/json") ||
+                    ctLower.contains("text/plain")) {
+                    val errorBody = response.body?.string()?.take(500)
+                    response.close()
+                    throw Exception("Contenu inattendu ($contentType au lieu de video/audio). " +
+                        "URL probablement expiree. Rechargez la page. Detail: $errorBody")
+                }
+
+                // Lire le body
+                val body = response.body ?: throw Exception("Response body null")
+                val inputStream = body.byteStream()
 
                 try {
-                    // First-byte content sniffing: read first 16 bytes to check it's media
+                    // First-byte content sniffing
                     val firstBytes = ByteArray(16)
-                    val bytesRead = stream.read(firstBytes)
+                    val bytesRead = inputStream.read(firstBytes)
                     if (bytesRead > 0) {
                         if (!isMediaContent(firstBytes, bytesRead)) {
                             val errorMsg = buildString {
@@ -301,14 +368,13 @@ class YouTubeDownloadTask {
                             tempFile.delete()
                             continue
                         }
-                        // Write the first bytes we already read
                         FileOutputStream(tempFile, startByte > 0).use { fos ->
                             fos.write(firstBytes, 0, bytesRead)
                             downloadedBytes = startByte + bytesRead
 
                             val buffer = ByteArray(BUFFER_SIZE)
                             var read: Int
-                            while (stream.read(buffer).also { read = it } != -1) {
+                            while (inputStream.read(buffer).also { read = it } != -1) {
                                 if (!isActive) {
                                     Log.d(TAG, "Telechargement annule")
                                     return@withContext
@@ -326,7 +392,7 @@ class YouTubeDownloadTask {
                         FileOutputStream(tempFile, startByte > 0).use { fos ->
                             val buffer = ByteArray(BUFFER_SIZE)
                             var read: Int
-                            while (stream.read(buffer).also { read = it } != -1) {
+                            while (inputStream.read(buffer).also { read = it } != -1) {
                                 if (!isActive) {
                                     Log.d(TAG, "Telechargement annule")
                                     return@withContext
@@ -341,11 +407,11 @@ class YouTubeDownloadTask {
                         }
                     }
                 } finally {
-                    try { stream.close() } catch (_: Exception) {}
-                    connection.disconnect()
+                    try { inputStream.close() } catch (_: Exception) {}
+                    response.close()
                 }
 
-                // Post-download validation: verify file is actual media
+                // Post-download validation
                 if (tempFile.exists()) {
                     if (!validateDownloadedFile(tempFile)) {
                         lastError = "Le fichier telecharge n'est pas un media valide (contenu errone). URL probablement expiree."
@@ -358,7 +424,7 @@ class YouTubeDownloadTask {
                     Log.d(TAG, "Telechargement termine: ${outputFile.absolutePath} (${outputFile.length() / 1024}KB)")
                     callback.onProgress(100, outputFile.length(), outputFile.length())
                     callback.onSuccess(outputFile)
-                    return@withContext // Success — exit retry loop
+                    return@withContext
                 } else {
                     callback.onError("Fichier temporaire introuvable")
                     return@withContext
@@ -381,12 +447,14 @@ class YouTubeDownloadTask {
         callback.onError(finalError)
     }
 
+    // ── DASH download + merge ──────────────────────────────────────────────
+
     private suspend fun downloadAndMergeDash(
+        httpClient: OkHttpClient,
         video: YouTubeExtractor.YouTubeStream,
         audio: YouTubeExtractor.YouTubeStream,
         outputDir: File,
         fileName: String,
-        cookies: String?,
         sendCookies: Boolean,
         callback: ProgressCallback
     ) = withContext(Dispatchers.IO) {
@@ -400,9 +468,9 @@ class YouTubeDownloadTask {
             // Etape 1/3: Telecharger la video (0-60%)
             Log.d(TAG, "DASH Step 1/3: Telechargement video (${video.qualityLabel})")
             downloadStreamToFile(
+                httpClient = httpClient,
                 url = video.url,
                 file = videoTemp,
-                cookies = cookies,
                 userAgent = video.userAgent,
                 sendCookies = sendCookies,
                 knownContentLength = video.contentLength
@@ -413,9 +481,9 @@ class YouTubeDownloadTask {
             // Etape 2/3: Telecharger l'audio (60-90%)
             Log.d(TAG, "DASH Step 2/3: Telechargement audio (${audio.qualityLabel})")
             downloadStreamToFile(
+                httpClient = httpClient,
                 url = audio.url,
                 file = audioTemp,
-                cookies = cookies,
                 userAgent = audio.userAgent,
                 sendCookies = sendCookies,
                 knownContentLength = audio.contentLength
@@ -438,7 +506,6 @@ class YouTubeDownloadTask {
                 callback.onSuccess(outputFile)
             } else {
                 Log.w(TAG, "Fusion MediaMuxer echouee, fallback video seule")
-                // Fallback: essayer de livrer la video seule avec extension .mp4
                 videoTemp.renameTo(outputFile)
                 callback.onSuccess(outputFile)
             }
@@ -452,15 +519,13 @@ class YouTubeDownloadTask {
     }
 
     /**
-     * Telecharge un stream unique vers un fichier (utilise pour DASH video/audio).
-     *
-     * PAS de requete HEAD — la taille est soit connue de l'extraction (knownContentLength),
-     * soit lue depuis le header Content-Length de la reponse GET.
+     * Telecharge un stream unique vers un fichier (DASH video/audio).
+     * Utilise OkHttp — PAS de requete HEAD prealable.
      */
     private fun downloadStreamToFile(
+        httpClient: OkHttpClient,
         url: String,
         file: File,
-        cookies: String?,
         userAgent: String?,
         sendCookies: Boolean,
         knownContentLength: Long = -1L,
@@ -470,22 +535,35 @@ class YouTubeDownloadTask {
         var downloaded = 0L
         var totalBytes = knownContentLength
 
-        val (connection, stream, contentLengthFromServer) = openConnection(
-            url = url,
-            cookies = cookies,
-            userAgent = userAgent,
-            sendCookies = sendCookies
-        )
+        val request = buildDownloadRequest(url, userAgent, sendCookies).build()
+        val response = httpClient.newCall(request).execute()
 
-        // Utiliser la taille du serveur si disponible
+        val code = response.code
+        if (code == 403) {
+            val errorBody = response.body?.string()?.take(300)
+            response.close()
+            throw Exception("HTTP 403 Forbidden sur stream DASH. Detail: $errorBody")
+        }
+        if (code !in 200..299) {
+            val errorBody = response.body?.string()?.take(200)
+            response.close()
+            throw Exception("HTTP $code inattendu sur stream DASH. Detail: $errorBody")
+        }
+
+        val contentLengthFromServer = response.body?.contentLength() ?: -1L
         if (contentLengthFromServer > 0) {
             totalBytes = contentLengthFromServer
         }
 
+        Log.d(TAG, "DASH stream: HTTP $code CL=$totalBytes pour: ${url.take(80)}...")
+
+        val body = response.body ?: throw Exception("Response body null (DASH)")
+        val inputStream = body.byteStream()
+
         try {
-            // First-byte content sniffing for DASH streams
+            // First-byte content sniffing
             val firstBytes = ByteArray(16)
-            val bytesRead = stream.read(firstBytes)
+            val bytesRead = inputStream.read(firstBytes)
             if (bytesRead > 0) {
                 if (!isMediaContent(firstBytes, bytesRead)) {
                     Log.e(TAG, "DASH stream: contenu non-media detecte (premiers bytes). URL expiree?")
@@ -494,7 +572,6 @@ class YouTubeDownloadTask {
             }
 
             FileOutputStream(file).use { fos ->
-                // Write the first bytes we already read
                 if (bytesRead > 0) {
                     fos.write(firstBytes, 0, bytesRead)
                     downloaded += bytesRead
@@ -503,7 +580,7 @@ class YouTubeDownloadTask {
 
                 val buffer = ByteArray(BUFFER_SIZE)
                 var read: Int
-                while (stream.read(buffer).also { read = it } != -1) {
+                while (inputStream.read(buffer).also { read = it } != -1) {
                     fos.write(buffer, 0, read)
                     downloaded += read
                     if (totalBytes > 0) {
@@ -512,8 +589,8 @@ class YouTubeDownloadTask {
                 }
             }
         } finally {
-            try { stream.close() } catch (_: Exception) {}
-            connection.disconnect()
+            try { inputStream.close() } catch (_: Exception) {}
+            response.close()
         }
 
         // Validate downloaded DASH stream
@@ -524,6 +601,8 @@ class YouTubeDownloadTask {
 
         Log.d(TAG, "Stream telecharge: ${file.name} (${file.length() / 1024}KB)")
     }
+
+    // ── MediaMuxer merge ──────────────────────────────────────────────────
 
     /**
      * Fusionne video + audio MP4 avec MediaMuxer (natif Android).
@@ -633,157 +712,5 @@ class YouTubeDownloadTask {
             if (mime.startsWith(mimePrefix)) return i
         }
         return -1
-    }
-
-    /**
-     * Ouvre une connexion GET vers l'URL de telechargement avec les headers corrects.
-     *
-     * Retourne un triplet (connection, inputStream, contentLength) ou contentLength
-     * est la taille lue depuis le header Content-Length du serveur (-1 si absent).
-     *
-     * Ne fait JAMAIS de requete HEAD prealable (googlevideo.com les rejette).
-     */
-    private fun openConnection(
-        url: String,
-        cookies: String?,
-        userAgent: String?,
-        sendCookies: Boolean,
-        rangeStart: Long = 0L
-    ): Triple<HttpURLConnection, InputStream, Long> {
-        var currentUrl = url
-        var redirectCount = 0
-
-        while (redirectCount < MAX_REDIRECTS) {
-            val connection = URL(currentUrl).openConnection() as HttpURLConnection
-            connection.apply {
-                requestMethod = "GET"
-                connectTimeout = 20_000
-                readTimeout = 120_000
-                instanceFollowRedirects = false
-                buildDownloadHeaders(cookies, userAgent, sendCookies).forEach { (k, v) ->
-                    setRequestProperty(k, v)
-                }
-                if (rangeStart > 0) {
-                    setRequestProperty("Range", "bytes=$rangeStart-")
-                }
-            }
-
-            val responseCode = connection.responseCode
-            val contentType = connection.getHeaderField("Content-Type") ?: ""
-            val contentLength = parseContentLength(connection, responseCode)
-            Log.d(TAG, "HTTP $responseCode (Content-Type: $contentType, CL: $contentLength) pour: ${currentUrl.take(100)}...")
-
-            when (responseCode) {
-                HttpURLConnection.HTTP_OK -> {
-                    // Validate Content-Type — reject HTML/JSON error pages
-                    val ctLower = contentType.lowercase()
-                    if (ctLower.contains("text/html") || ctLower.contains("application/json") ||
-                        ctLower.contains("text/plain")) {
-                        val errorBody = try {
-                            connection.inputStream?.bufferedReader()?.readText()?.take(500)
-                        } catch (_: Exception) { null }
-                        connection.disconnect()
-                        throw Exception("Contenu inattendu ($contentType au lieu de video/audio). " +
-                            "URL probablement expiree. Rechargez la page. Detail: ${errorBody ?: "N/A"}")
-                    }
-                    return Triple(connection, connection.inputStream, contentLength)
-                }
-                HttpURLConnection.HTTP_PARTIAL -> {
-                    // 206 Partial Content — reponse a un Range request
-                    return Triple(connection, connection.inputStream, contentLength)
-                }
-                HttpURLConnection.HTTP_MOVED_TEMP,
-                HttpURLConnection.HTTP_MOVED_PERM,
-                307, 308 -> {
-                    val location = connection.getHeaderField("Location")
-                        ?: throw Exception("Redirection sans Location header")
-                    connection.disconnect()
-                    // Gerer les URLs de redirection relatives
-                    currentUrl = if (location.startsWith("http://") || location.startsWith("https://")) {
-                        location
-                    } else {
-                        val base = URL(currentUrl)
-                        URL(base, location).toString()
-                    }
-                    redirectCount++
-                    Log.d(TAG, "Redirection $redirectCount/$MAX_REDIRECTS vers: ${currentUrl.take(80)}...")
-                }
-                403 -> {
-                    val errorBody = try {
-                        connection.errorStream?.bufferedReader()?.readText()?.take(300)
-                    } catch (_: Exception) { null }
-                    connection.disconnect()
-                    throw Exception("HTTP 403 Forbidden — URL expiree ou acces refuse. " +
-                        "Rechargez la page video YouTube et reessayez. Detail: ${errorBody ?: "N/A"}")
-                }
-                else -> {
-                    val errorBody = try {
-                        connection.errorStream?.bufferedReader()?.readText()?.take(200)
-                    } catch (_: Exception) { null }
-                    connection.disconnect()
-                    throw Exception("HTTP $responseCode inattendu. Detail: ${errorBody ?: "N/A"}")
-                }
-            }
-        }
-        throw Exception("Trop de redirections ($MAX_REDIRECTS)")
-    }
-
-    /**
-     * Extrait le Content-Length de la reponse HTTP.
-     * Pour 200 OK : c'est la taille totale du fichier.
-     * Pour 206 Partial : c'est la taille de la portion demandee (restante).
-     */
-    private fun parseContentLength(connection: HttpURLConnection, responseCode: Int): Long {
-        return try {
-            // Content-Length du header de reponse
-            var length = connection.getHeaderField("Content-Length")?.toLongOrNull() ?: -1L
-
-            // Pour 206 Partial, essayer de lire Content-Range pour la taille totale
-            // Format: "bytes START-END/TOTAL" ou "bytes START-END/*"
-            if (responseCode == HttpURLConnection.HTTP_PARTIAL) {
-                val contentRange = connection.getHeaderField("Content-Range")
-                if (contentRange != null) {
-                    // Parser "bytes 0-9999/12345678" -> extraire 12345678
-                    val slashIndex = contentRange.lastIndexOf('/')
-                    if (slashIndex >= 0) {
-                        val totalStr = contentRange.substring(slashIndex + 1).trim()
-                        if (totalStr != "*") {
-                            length = totalStr.toLongOrNull() ?: length
-                        }
-                    }
-                }
-            }
-
-            length
-        } catch (e: Exception) {
-            Log.w(TAG, "Erreur parsing Content-Length: ${e.message}")
-            -1L
-        }
-    }
-
-    private fun getYouTubeCookies(): String? {
-        return try {
-            val cookieManager = CookieManager.getInstance()
-            val ytCookies = cookieManager.getCookie("https://www.youtube.com")
-            val googleCookies = cookieManager.getCookie("https://google.com")
-
-            listOfNotNull(ytCookies, googleCookies)
-                .joinToString("; ")
-                .takeIf { it.isNotEmpty() }
-        } catch (e: Exception) {
-            Log.w(TAG, "Impossible de recuperer les cookies: ${e.message}")
-            null
-        }
-    }
-
-    private fun Pair<HttpURLConnection, InputStream>.use(
-        block: (Pair<HttpURLConnection, InputStream>) -> Unit
-    ) {
-        try {
-            block(this)
-        } finally {
-            try { second.close() } catch (_: Exception) {}
-            try { first.disconnect() } catch (_: Exception) {}
-        }
     }
 }
