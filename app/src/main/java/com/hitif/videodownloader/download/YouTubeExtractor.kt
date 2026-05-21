@@ -146,6 +146,14 @@ class YouTubeExtractor {
             url.contains("m.youtube.com/watch") ||
             url.contains("music.youtube.com/watch")
 
+        /** Verifie si une URL est une URL YouTube (page OU stream googlevideo) */
+        fun isYouTubeUrl(url: String): Boolean =
+            url.contains("youtube.com/watch") ||
+            url.contains("youtube.com/shorts/") ||
+            url.contains("youtu.be/") ||
+            url.contains("youtube.com/embed/") ||
+            url.contains("googlevideo.com")
+
         fun isGoogleVideoUrl(url: String): Boolean =
             url.contains("googlevideo.com") || url.contains("/videoplayback")
     }
