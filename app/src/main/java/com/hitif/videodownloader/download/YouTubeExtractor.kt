@@ -11,6 +11,7 @@ import java.security.MessageDigest
 
 /**
  * YouTubeExtractor — Extraction des streams YouTube via l'API InnerTube.
+ * Package : com.hitif.videodownloader.download
  *
  * STRATEGIE D'EXTRACTION (DUAL CLIENT) :
  * ─────────────────────────────────────────────────────────────────────────
@@ -20,21 +21,13 @@ import java.security.MessageDigest
  *
  * 2. ANDROID client (clientName=3) : Fallback sans cookies. Fonctionne pour
  *    les videos publiques uniquement.
- *
- * POURQUOI L'ANCIENNE APPROCHE ECHOUAIT :
- * Le client ANDROID (v19.29.37) sans SAPISIDHASH etait bloque par YouTube
- * car la version etait obsolete et trop de requetes non-authentifiees sont
- * desormais rejetees avec playabilityStatus=LOGIN_REQUIRED.
  */
 class YouTubeExtractor {
 
     companion object {
         private const val TAG = "YouTubeExtractor"
-
-        // API InnerTube endpoint
         private const val INNERTUBE_URL =
             "https://www.youtube.com/youtubei/v1/player?prettyPrint=false"
-
         private const val ORIGIN = "https://www.youtube.com"
 
         // ── WEB client (primaire — avec cookies) ──────────────────────
@@ -49,8 +42,10 @@ class YouTubeExtractor {
             "com.google.android.youtube/$ANDROID_CLIENT_VERSION " +
             "(Linux; U; Android 14; en_US) gzip"
 
+        // ── Utilitaires ──────────────────────────────────────────────
+
         /**
-         * Calcule le sapisidhash pour l'authorization header.
+         * Calcule le sapisidhash pour le header Authorization.
          * Format: SAPISIDHASH <timestamp>_<SHA1(timestamp + " " + SAPISID + " " + origin)>
          */
         fun computeSapisidhash(sapisid: String, origin: String = ORIGIN): String {
@@ -64,7 +59,6 @@ class YouTubeExtractor {
         /** Extrait le cookie SAPISID depuis une chaine de cookies */
         fun extractSapisid(cookies: String?): String? {
             if (cookies.isNullOrEmpty()) return null
-            // Parse cookie string "name=value; name2=value2; ..."
             val cookieMap = cookies.split(";").associate { entry ->
                 val parts = entry.trim().split("=", limit = 2)
                 if (parts.size == 2) parts[0].trim() to parts[1].trim()
@@ -73,7 +67,7 @@ class YouTubeExtractor {
             return cookieMap["SAPISID"] ?: cookieMap["__Secure-3PAPISID"]
         }
 
-        fun buildInnerTubeBody(videoId: String, useWebClient: Boolean): String {
+        private fun buildInnerTubeBody(videoId: String, useWebClient: Boolean): String {
             return if (useWebClient) """
                 {
                   "videoId": "$videoId",
@@ -126,7 +120,9 @@ class YouTubeExtractor {
             """.trimIndent()
         }
 
-        /** Extrait l'ID video depuis une URL YouTube */
+        /**
+         * Extrait l'ID video depuis une URL YouTube.
+         */
         fun extractVideoId(url: String): String? {
             if (url.isBlank()) return null
             val patterns = listOf(
@@ -140,28 +136,18 @@ class YouTubeExtractor {
             return null
         }
 
-        /** Verifie si une URL est une URL YouTube page ou stream */
-        fun isYouTubeUrl(url: String): Boolean {
-            return url.contains("youtube.com/watch") ||
-                    url.contains("youtu.be/") ||
-                    url.contains("youtube.com/shorts/") ||
-                    url.contains("youtube.com/embed/") ||
-                    url.contains("googlevideo.com")
-        }
+        /**
+         * Verifie si c'est une page video YouTube (pas la home, pas la recherche).
+         */
+        fun isYouTubePageUrl(url: String): Boolean =
+            url.contains("youtube.com/watch") ||
+            url.contains("youtube.com/shorts/") ||
+            url.contains("youtu.be/") ||
+            url.contains("m.youtube.com/watch") ||
+            url.contains("music.youtube.com/watch")
 
-        /** Verifie si une URL est un stream GoogleVideo (session-bound) */
         fun isGoogleVideoUrl(url: String): Boolean =
-            url.contains("googlevideo.com") || url.contains("videoplayback")
-
-        /** Verifie si l'URL est une page YouTube (pas un stream) */
-        fun isYouTubePageUrl(url: String): Boolean {
-            return url.contains("youtube.com/watch") ||
-                    url.contains("youtu.be/") ||
-                    url.contains("youtube.com/shorts/") ||
-                    url.contains("youtube.com/embed/") ||
-                    url.contains("m.youtube.com/watch") ||
-                    url.contains("music.youtube.com/watch")
-        }
+            url.contains("googlevideo.com") || url.contains("/videoplayback")
     }
 
     // ── Data classes ──────────────────────────────────────────────────────
@@ -180,7 +166,6 @@ class YouTubeExtractor {
         val fps: Int = 0,
         val audioQuality: String? = null
     ) {
-        val isAdaptive: Boolean get() = hasVideo != hasAudio
         val isMuxed: Boolean get() = hasVideo && hasAudio
         val fileExtension: String get() = when {
             mimeType.contains("mp4") -> "mp4"
@@ -200,11 +185,9 @@ class YouTubeExtractor {
         val audioOnlyFormats: List<YouTubeStream>,
         val hlsManifestUrl: String?
     ) {
-        /** Meilleur format combine (pas de fusion necessaire) */
         fun bestMuxedFormat(): YouTubeStream? =
             muxedFormats.sortedByDescending { it.height }.firstOrNull()
 
-        /** Meilleure paire video + audio pour DASH */
         fun bestAdaptivePair(maxHeight: Int = 1080): Pair<YouTubeStream, YouTubeStream>? {
             val video = videoOnlyFormats
                 .filter { it.height <= maxHeight && it.mimeType.contains("mp4") }
@@ -238,13 +221,13 @@ class YouTubeExtractor {
         data class Error(val message: String) : DownloadStrategy()
     }
 
-    // ── Extraction API ───────────────────────────────────────────────────
+    // ── Extraction ────────────────────────────────────────────────────────
 
     /**
      * Extrait les streams pour une URL YouTube.
-     * @param youtubeUrl URL YouTube ou googlevideo
-     * @param pageUrl URL de la page courante (pour extraction videoId)
-     * @param cookies Cookies du WebView (pour sapisidhash auth)
+     * @param youtubeUrl  URL YouTube (watch, shorts, youtu.be)
+     * @param pageUrl     URL de la page courante (pour extraire le videoId si besoin)
+     * @param cookies     Cookies du WebView (pour calculer sapisidhash)
      */
     suspend fun extract(
         youtubeUrl: String,
@@ -254,26 +237,27 @@ class YouTubeExtractor {
         val videoId = extractVideoId(youtubeUrl)
             ?: extractVideoId(pageUrl ?: "")
             ?: run {
-                Log.e(TAG, "Impossible d'extraire l'ID video depuis: $youtubeUrl (pageUrl=$pageUrl)")
+                Log.e(TAG, "Impossible d'extraire l'ID video: $youtubeUrl")
                 return@withContext null
             }
-        Log.d(TAG, "Extraction InnerTube pour videoId: $videoId")
+        Log.d(TAG, "InnerTube extraction pour videoId=$videoId")
 
         val sapisid = extractSapisid(cookies)
 
         if (sapisid != null) {
+            // Priorite 1 : WEB client + sapisidhash (meilleure compatibilite)
             Log.d(TAG, "SAPISID found — using WEB client with sapisidhash")
             callInnerTubeApi(videoId, useWebClient = true, sapisid = sapisid)
         } else {
-            Log.d(TAG, "No SAPISID cookie — falling back to ANDROID client")
-            // Try ANDROID client first (no auth needed for public videos)
+            // Priorite 2 : ANDROID client (fallback public)
+            Log.d(TAG, "No SAPISID cookie — trying ANDROID client")
             val result = callInnerTubeApi(videoId, useWebClient = false, sapisid = null)
-            if (result == null) {
-                // Retry with WEB client even without SAPISID (some public videos work)
-                Log.d(TAG, "ANDROID client failed — retrying with WEB client (no auth)")
-                callInnerTubeApi(videoId, useWebClient = true, sapisid = null)
-            } else {
+            if (result != null) {
                 result
+            } else {
+                // Priorite 3 : WEB client sans auth (dernier recours)
+                Log.d(TAG, "ANDROID failed — retrying with WEB client (no auth)")
+                callInnerTubeApi(videoId, useWebClient = true, sapisid = null)
             }
         }
     }
@@ -282,6 +266,8 @@ class YouTubeExtractor {
         withContext(Dispatchers.IO) {
             callInnerTubeApi(videoId, useWebClient = false, sapisid = null)
         }
+
+    // ── InnerTube API call ───────────────────────────────────────────────
 
     private fun callInnerTubeApi(
         videoId: String,
@@ -305,7 +291,7 @@ class YouTubeExtractor {
                 instanceFollowRedirects = false
             }
 
-            // ── Headers ──────────────────────────────────────────────
+            // ── Headers selon le client ──────────────────────────────
             if (useWebClient) {
                 connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
                 connection.setRequestProperty("User-Agent", WEB_UA)
@@ -316,7 +302,7 @@ class YouTubeExtractor {
                 connection.setRequestProperty("Origin", ORIGIN)
                 connection.setRequestProperty("Referer", "$ORIGIN/")
 
-                // Authorization avec sapisidhash
+                // Authorization avec sapisidhash si SAPISID disponible
                 if (sapisid != null) {
                     val authHeader = computeSapisidhash(sapisid)
                     connection.setRequestProperty("Authorization", authHeader)
@@ -334,24 +320,23 @@ class YouTubeExtractor {
                 connection.setRequestProperty("Referer", "$ORIGIN/")
             }
 
-            // ── Send request ─────────────────────────────────────────
+            // ── Envoi de la requete ───────────────────────────────────
             val body = buildInnerTubeBody(videoId, useWebClient).toByteArray(Charsets.UTF_8)
             connection.outputStream.use { it.write(body) }
 
-            // ── Read response ────────────────────────────────────────
-            val responseCode = connection.responseCode
-            if (responseCode != 200) {
+            // ── Lecture de la reponse ─────────────────────────────────
+            val code = connection.responseCode
+            if (code != 200) {
                 val errorBody = connection.errorStream?.bufferedReader()?.readText()
-                Log.e(TAG, "InnerTube HTTP $responseCode (${if (useWebClient) "WEB" else "ANDROID"}) " +
+                Log.e(TAG, "InnerTube HTTP $code (${if (useWebClient) "WEB" else "ANDROID"}) " +
                     "pour videoId=$videoId: ${errorBody?.take(500)}")
                 connection.disconnect()
                 return null
             }
 
-            val responseText = connection.inputStream.bufferedReader().readText()
+            val response = connection.inputStream.bufferedReader().readText()
             connection.disconnect()
-
-            return parseInnerTubeResponse(videoId, responseText, useWebClient)
+            return parseInnerTubeResponse(videoId, response, useWebClient)
 
         } catch (e: Exception) {
             Log.e(TAG, "Erreur InnerTube API (${if (useWebClient) "WEB" else "ANDROID"}): ${e.message}", e)
@@ -360,12 +345,14 @@ class YouTubeExtractor {
         }
     }
 
+    // ── Parsing de la reponse ─────────────────────────────────────────────
+
     private fun parseInnerTubeResponse(
         videoId: String,
         json: String,
         useWebClient: Boolean
     ): ExtractionResult? {
-        try {
+        return try {
             val root = JSONObject(json)
 
             // Verifier le statut de lecture
@@ -383,7 +370,6 @@ class YouTubeExtractor {
                     "[client=${if (useWebClient) "WEB" else "ANDROID"}]")
                 return null
             }
-            // Log non-OK status for debugging
             if (status != null && status != "OK") {
                 val reason = playabilityStatus?.optString("reason") ?: ""
                 Log.w(TAG, "Playability status=$status reason=$reason ($videoId)")
@@ -392,143 +378,114 @@ class YouTubeExtractor {
             // Metadonnees
             val videoDetails = root.optJSONObject("videoDetails")
             val title = videoDetails?.optString("title") ?: "YouTube_$videoId"
-            val durationSeconds = videoDetails?.optString("lengthSeconds")?.toLongOrNull() ?: 0L
-            val thumbnails = videoDetails?.optJSONObject("thumbnail")
-                ?.optJSONArray("thumbnails")
-            val thumbnail = if (thumbnails != null && thumbnails.length() > 0)
-                thumbnails.getJSONObject(thumbnails.length() - 1).optString("url") ?: ""
-            else ""
+            val duration = videoDetails?.optString("lengthSeconds")?.toLongOrNull() ?: 0L
+            val thumbs = videoDetails?.optJSONObject("thumbnail")?.optJSONArray("thumbnails")
+            val thumbnail = if (thumbs != null && thumbs.length() > 0)
+                thumbs.getJSONObject(thumbs.length() - 1).optString("url") else ""
 
-            // Streaming data — CRITICAL
+            // Streaming data
             val streamingData = root.optJSONObject("streamingData")
             if (streamingData == null) {
-                // Video might be a live stream or otherwise restricted
                 val isLive = videoDetails?.optBoolean("isLive", false) ?: false
                 val isLiveContent = videoDetails?.optBoolean("isLiveContent", false) ?: false
                 if (isLive || isLiveContent) {
                     Log.w(TAG, "Video $videoId est un live — pas de streamingData")
                 } else {
-                    Log.e(TAG, "Pas de streamingData pour $videoId. " +
+                    Log.e(TAG, "Pas de streamingData pour videoId=$videoId. " +
                         "playability=$status, title='$title'")
                 }
                 return null
             }
 
-            val hlsManifestUrl = streamingData.optString("hlsManifestUrl")
-                .takeIf { it.isNotEmpty() }
+            val hlsUrl = streamingData.optString("hlsManifestUrl").takeIf { it.isNotEmpty() }
+            val muxed = mutableListOf<YouTubeStream>()
+            val videoOnly = mutableListOf<YouTubeStream>()
+            val audioOnly = mutableListOf<YouTubeStream>()
 
-            val muxedFormats = mutableListOf<YouTubeStream>()
-            val videoOnlyFormats = mutableListOf<YouTubeStream>()
-            val audioOnlyFormats = mutableListOf<YouTubeStream>()
-
-            // formats = muxed (video+audio combined, typically max 720p)
             streamingData.optJSONArray("formats")?.let { arr ->
-                for (i in 0 until arr.length()) {
-                    parseFormat(arr.getJSONObject(i), hasVideo = true, hasAudio = true)
-                        ?.let { muxedFormats.add(it) }
-                }
+                for (i in 0 until arr.length())
+                    parseFormat(arr.getJSONObject(i), true, true)?.let { muxed.add(it) }
             }
-
-            // adaptiveFormats = DASH (video-only OR audio-only)
             streamingData.optJSONArray("adaptiveFormats")?.let { arr ->
                 for (i in 0 until arr.length()) {
                     val obj = arr.getJSONObject(i)
                     val mime = obj.optString("mimeType")
                     when {
-                        mime.startsWith("video/") -> {
-                            parseFormat(obj, hasVideo = true, hasAudio = false)
-                                ?.let { videoOnlyFormats.add(it) }
-                        }
-                        mime.startsWith("audio/") -> {
-                            parseFormat(obj, hasVideo = false, hasAudio = true)
-                                ?.let { audioOnlyFormats.add(it) }
-                        }
+                        mime.startsWith("video/") ->
+                            parseFormat(obj, true, false)?.let { videoOnly.add(it) }
+                        mime.startsWith("audio/") ->
+                            parseFormat(obj, false, true)?.let { audioOnly.add(it) }
                     }
                 }
             }
 
-            val totalFormats = muxedFormats.size + videoOnlyFormats.size + audioOnlyFormats.size
-            Log.d(TAG,
-                "Extraction OK ($videoId): '$title' | " +
-                "muxed=${muxedFormats.size} video=${videoOnlyFormats.size} " +
-                "audio=${audioOnlyFormats.size} total=$totalFormats" +
-                if (hlsManifestUrl != null) " +HLS" else ""
-            )
+            Log.d(TAG, "Extraction OK: $title | muxed=${muxed.size} video=${videoOnly.size} audio=${audioOnly.size}")
 
-            return ExtractionResult(
+            ExtractionResult(
                 videoId = videoId,
                 title = title,
-                duration = durationSeconds,
+                duration = duration,
                 thumbnail = thumbnail,
-                muxedFormats = muxedFormats.sortedByDescending { it.height },
-                videoOnlyFormats = videoOnlyFormats.sortedByDescending { it.height },
-                audioOnlyFormats = audioOnlyFormats.sortedByDescending { it.contentLength },
-                hlsManifestUrl = hlsManifestUrl
+                muxedFormats = muxed.sortedByDescending { it.height },
+                videoOnlyFormats = videoOnly.sortedByDescending { it.height },
+                audioOnlyFormats = audioOnly.sortedByDescending { it.contentLength },
+                hlsManifestUrl = hlsUrl
             )
-
         } catch (e: Exception) {
-            Log.e(TAG, "Erreur parsing reponse InnerTube ($videoId): ${e.message}", e)
-            return null
+            Log.e(TAG, "Parsing InnerTube erreur: ${e.message}", e)
+            null
         }
     }
 
+    // ── Format parsing ───────────────────────────────────────────────────
+
     private fun parseFormat(obj: JSONObject, hasVideo: Boolean, hasAudio: Boolean): YouTubeStream? {
-        try {
+        return try {
             val url = obj.optString("url").takeIf { it.isNotEmpty() }
                 ?: decodeCipher(
                     obj.optString("signatureCipher").takeIf { it.isNotEmpty() }
                         ?: obj.optString("cipher").takeIf { it.isNotEmpty() }
                         ?: return null
-                )
-                ?: return null
+                ) ?: return null
 
             val mimeType = obj.optString("mimeType").substringBefore(";").trim()
-            val itag = obj.optInt("itag", 0)
-            val qualityLabel = obj.optString("qualityLabel").takeIf { it.isNotEmpty() }
-            val quality = obj.optString("quality")
-            val width = obj.optInt("width", 0)
             val height = obj.optInt("height", 0)
-            val fps = obj.optInt("fps", 0)
-            val audioQuality = obj.optString("audioQuality").takeIf { it.isNotEmpty() }
-            val contentLength = obj.optString("contentLength").toLongOrNull()
-                ?: obj.optLong("contentLength", 0L)
 
-            return YouTubeStream(
-                url = url, mimeType = mimeType, quality = quality,
-                qualityLabel = qualityLabel ?: resolveQualityLabel(height),
-                width = width, height = height, contentLength = contentLength,
-                hasVideo = hasVideo, hasAudio = hasAudio,
-                itag = itag, fps = fps, audioQuality = audioQuality
+            YouTubeStream(
+                url = url,
+                mimeType = mimeType,
+                quality = obj.optString("quality"),
+                qualityLabel = obj.optString("qualityLabel").takeIf { it.isNotEmpty() }
+                    ?: if (height > 0) "${height}p" else "Audio",
+                width = obj.optInt("width", 0),
+                height = height,
+                contentLength = obj.optString("contentLength").toLongOrNull()
+                    ?: obj.optLong("contentLength", 0L),
+                hasVideo = hasVideo,
+                hasAudio = hasAudio,
+                itag = obj.optInt("itag", 0),
+                fps = obj.optInt("fps", 0),
+                audioQuality = obj.optString("audioQuality").takeIf { it.isNotEmpty() }
             )
         } catch (e: Exception) {
-            Log.w(TAG, "Impossible de parser le format itag=${obj.optInt("itag")}: ${e.message}")
-            return null
+            Log.w(TAG, "Format parse erreur: ${e.message}")
+            null
         }
     }
 
     /**
      * Decode signatureCipher / cipher parameter into a download URL.
-     *
-     * For the WEB client, formats may have signatureCipher instead of direct URL.
-     * The cipher contains: url, s (obfuscated signature), sp (sig param name), n (nsig).
-     *
-     * NOTE: The 's' parameter is an obfuscated signature that normally needs to be
-     * decoded using the YouTube player's JavaScript signature function. However,
-     * when using the WEB client with valid sapisidhash, the InnerTube API often
-     * returns direct URLs (no cipher needed) or cipher with pre-decoded 'sig'.
-     * If extraction still fails, full nsig deobfuscation would be needed.
+     * Inclut le parametre 'n' (nsig) pour eviter le throttling/403.
      */
     private fun decodeCipher(cipher: String?): String? {
-        if (cipher == null) return null
-        try {
-            val params = cipher.split("&").associate { param ->
-                val idx = param.indexOf('=')
-                if (idx < 0) param to ""
-                else param.substring(0, idx) to URLDecoder.decode(param.substring(idx + 1), "UTF-8")
+        cipher ?: return null
+        return try {
+            val params = cipher.split("&").associate { p ->
+                val i = p.indexOf('=')
+                if (i < 0) p to "" else p.substring(0, i) to URLDecoder.decode(p.substring(i + 1), "UTF-8")
             }
             val baseUrl = params["url"] ?: return null
 
-            // Build the decoded URL with all relevant parameters
             val decodedUrl = StringBuilder(baseUrl)
 
             // Signature parameter (s/sig -> sp)
@@ -539,7 +496,6 @@ class YouTubeExtractor {
             }
 
             // nsig parameter (n) — YouTube throttling signature
-            // Required to avoid download speed throttling or 403 errors
             val nsig = params["n"]
             if (nsig != null) {
                 decodedUrl.append("&n=").append(nsig)
@@ -551,25 +507,10 @@ class YouTubeExtractor {
                 decodedUrl.append("&dn=").append(dn)
             }
 
-            val result = decodedUrl.toString()
-            Log.d(TAG, "decodeCipher: URL length=${result.length}, " +
-                "has_sig=${sig != null}, has_nsig=${nsig != null}")
-            return result
+            decodedUrl.toString()
         } catch (e: Exception) {
-            Log.w(TAG, "Impossible de decoder le cipher: ${e.message}")
-            return null
+            Log.w(TAG, "Cipher decode erreur: ${e.message}")
+            null
         }
-    }
-
-    private fun resolveQualityLabel(height: Int): String = when {
-        height >= 2160 -> "4K (2160p)"
-        height >= 1440 -> "1440p"
-        height >= 1080 -> "1080p HD"
-        height >= 720  -> "720p HD"
-        height >= 480  -> "480p"
-        height >= 360  -> "360p"
-        height >= 240  -> "240p"
-        height > 0     -> "${height}p"
-        else           -> "Audio"
     }
 }
