@@ -41,7 +41,8 @@ class YouTubeExtractor {
         private const val ORIGIN = "https://www.youtube.com"
 
         // ── Client TV Embedded (PRIMAIRE — pas de PO token) ─────────────────
-        private const val TV_EMBED_VERSION = "2.0"
+        // Version identique a yt-dlp (exemptee du PO Token par YouTube)
+        private const val TV_EMBED_VERSION = "7.20231219"
 
         // ── Client iOS (SECONDAIRE — pas de PO token) ────────────────────────
         private const val IOS_VERSION = "19.45.4"
@@ -80,7 +81,7 @@ class YouTubeExtractor {
                           "utcOffsetMinutes": 0
                         },
                         "thirdParty": {
-                          "embedUrl": "https://www.youtube.com/"
+                          "embedUrl": "https://www.youtube.com/embed/$videoId"
                         }
                       },
                       "contentCheckOk": true,
