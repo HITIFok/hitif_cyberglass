@@ -296,7 +296,14 @@ class YouTubeExtractor {
         val muxedFormats: List<YouTubeStream>,
         val videoOnlyFormats: List<YouTubeStream>,
         val audioOnlyFormats: List<YouTubeStream>,
-        val hlsManifestUrl: String?
+        val hlsManifestUrl: String?,
+        /** Client qui a reussi l'extraction — utilise pour prendre les bonnes decisions
+         *  au telechargement (envoyer ou non les cookies, quels headers envoyer). */
+        val extractedWithClient: Client = Client.TV_EMBEDDED,
+        /** true si l'extraction a utilise sessionClient (avec cookies WebView).
+         *  false si cleanClient (sans cookies) — TV_EMBEDDED, IOS, ANDROID.
+         *  CRITIQUE : ne JAMAIS envoyer de cookies au telechargement si false. */
+        val usedSessionClient: Boolean = false
     ) {
         fun bestMuxedFormat(): YouTubeStream? =
             muxedFormats.sortedByDescending { it.height }.firstOrNull()
@@ -418,7 +425,7 @@ class YouTubeExtractor {
                 return null
             }
 
-            parseResponse(videoId, responseBody, client)
+            parseResponse(videoId, responseBody, client, useSession)
         } catch (e: Exception) {
             Log.e(TAG, "[$client][$videoId] Exception: ${e.javaClass.simpleName}: ${e.message}")
             null
@@ -427,7 +434,7 @@ class YouTubeExtractor {
 
     // ── Parsing ───────────────────────────────────────────────────────────────
 
-    private fun parseResponse(videoId: String, json: String, client: Client): ExtractionResult? {
+    private fun parseResponse(videoId: String, json: String, client: Client, usedSession: Boolean): ExtractionResult? {
         return try {
             val root        = JSONObject(json)
             val playability = root.optJSONObject("playabilityStatus")
@@ -495,14 +502,16 @@ class YouTubeExtractor {
             Log.d(TAG, "[$client][$videoId] SUCCÈS: \"$title\"")
 
             ExtractionResult(
-                videoId          = videoId,
-                title            = title,
-                duration         = duration,
-                thumbnail        = thumbnail,
-                muxedFormats     = muxed.sortedByDescending { it.height },
-                videoOnlyFormats = videoOnly.sortedByDescending { it.height },
-                audioOnlyFormats = audioOnly.sortedByDescending { it.contentLength },
-                hlsManifestUrl   = hlsUrl
+                videoId            = videoId,
+                title              = title,
+                duration           = duration,
+                thumbnail          = thumbnail,
+                muxedFormats       = muxed.sortedByDescending { it.height },
+                videoOnlyFormats   = videoOnly.sortedByDescending { it.height },
+                audioOnlyFormats   = audioOnly.sortedByDescending { it.contentLength },
+                hlsManifestUrl     = hlsUrl,
+                extractedWithClient = client,
+                usedSessionClient  = usedSession
             )
         } catch (e: Exception) {
             Log.e(TAG, "[$client][$videoId] Parsing erreur: ${e.javaClass.simpleName}: ${e.message}")
