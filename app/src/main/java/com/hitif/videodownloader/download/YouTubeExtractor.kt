@@ -58,7 +58,7 @@ class YouTubeExtractor {
             val input = "$timestamp $sapisid $origin"
             val digest = MessageDigest.getInstance("SHA-1").digest(input.toByteArray())
             val hash = digest.joinToString("") { "%02x".format(it) }
-            return "SAPISIDHASH $timestamp_$hash"
+            return "SAPISIDHASH ${timestamp}_${hash}"
         }
 
         /** Extrait le cookie SAPISID depuis une chaine de cookies */
