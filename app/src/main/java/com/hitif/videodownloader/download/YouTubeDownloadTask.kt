@@ -35,9 +35,9 @@ class YouTubeDownloadTask {
         private const val MAX_DOWNLOAD_ATTEMPTS = 3
         private const val RETRY_DELAY_MS = 2_000L
 
-        private fun buildDownloadHeaders(cookies: String?): Map<String, String> {
+        private fun buildDownloadHeaders(cookies: String?, userAgent: String? = null): Map<String, String> {
             val headers = mutableMapOf(
-                "User-Agent"       to YT_ANDROID_UA,
+                "User-Agent"       to (userAgent ?: YT_ANDROID_UA),
                 "Accept"           to "*/*",
                 "Accept-Language"  to "en-US,en;q=0.9",
                 "Accept-Encoding"  to "identity",
@@ -138,6 +138,7 @@ class YouTubeDownloadTask {
         outputDir: File,
         fileName: String,
         preferHighQuality: Boolean = false,
+        userAgent: String? = null,
         callback: ProgressCallback
     ) = withContext(Dispatchers.IO) {
         val cookies = getYouTubeCookies()
@@ -147,7 +148,7 @@ class YouTubeDownloadTask {
             is YouTubeExtractor.DownloadStrategy.Muxed -> {
                 Log.d(TAG, "Strategie: MUXED — ${strategy.stream.qualityLabel} (${strategy.stream.fileExtension})")
                 val file = File(outputDir, "$fileName.${strategy.stream.fileExtension}")
-                downloadSingleStream(strategy.stream.url, file, cookies, callback)
+                downloadSingleStream(strategy.stream.url, file, cookies, strategy.stream.userAgent, callback)
             }
 
             is YouTubeExtractor.DownloadStrategy.Adaptive -> {
@@ -172,6 +173,7 @@ class YouTubeDownloadTask {
         url: String,
         outputFile: File,
         cookies: String?,
+        userAgent: String? = null,
         callback: ProgressCallback
     ) = withContext(Dispatchers.IO) {
         outputFile.parentFile?.mkdirs()
@@ -187,7 +189,7 @@ class YouTubeDownloadTask {
                     tempFile.delete()
                 }
 
-                val totalBytes = getContentLength(url, cookies)
+                val totalBytes = getContentLength(url, cookies, userAgent)
                 var downloadedBytes = 0L
 
                 // Reprise si fichier temporaire existant
@@ -200,7 +202,7 @@ class YouTubeDownloadTask {
 
                 // Open connection manually (avoid non-inline use{} lambda so
                 // that continue/return@withContext can cross into the for-loop)
-                val (connection, stream) = openConnection(url, cookies, rangeStart = startByte)
+                val (connection, stream) = openConnection(url, cookies, userAgent, rangeStart = startByte)
                 try {
                     // First-byte content sniffing: read first 16 bytes to check it's media
                     val firstBytes = ByteArray(16)
@@ -314,13 +316,13 @@ class YouTubeDownloadTask {
         try {
             // Etape 1/3: Telecharger la video (0-60%)
             Log.d(TAG, "DASH Step 1/3: Telechargement video (${video.qualityLabel})")
-            downloadStreamToFile(video.url, videoTemp, cookies) { percent ->
+            downloadStreamToFile(video.url, videoTemp, cookies, video.userAgent) { percent ->
                 callback.onProgress((percent * 0.6).toInt(), 0, 0)
             }
 
             // Etape 2/3: Telecharger l'audio (60-90%)
             Log.d(TAG, "DASH Step 2/3: Telechargement audio (${audio.qualityLabel})")
-            downloadStreamToFile(audio.url, audioTemp, cookies) { percent ->
+            downloadStreamToFile(audio.url, audioTemp, cookies, audio.userAgent) { percent ->
                 callback.onProgress(60 + (percent * 0.3).toInt(), 0, 0)
             }
 
@@ -356,13 +358,14 @@ class YouTubeDownloadTask {
         url: String,
         file: File,
         cookies: String?,
+        userAgent: String? = null,
         onProgress: (Int) -> Unit
     ) {
-        val totalBytes = getContentLength(url, cookies)
+        val totalBytes = getContentLength(url, cookies, userAgent)
         var downloaded = 0L
 
         file.parentFile?.mkdirs()
-        val (connection, stream) = openConnection(url, cookies)
+        val (connection, stream) = openConnection(url, cookies, userAgent)
         try {
             // First-byte content sniffing for DASH streams
             val firstBytes = ByteArray(16)
@@ -519,6 +522,7 @@ class YouTubeDownloadTask {
     private fun openConnection(
         url: String,
         cookies: String?,
+        userAgent: String? = null,
         rangeStart: Long = 0L
     ): Pair<HttpURLConnection, InputStream> {
         var currentUrl = url
@@ -531,7 +535,7 @@ class YouTubeDownloadTask {
                 connectTimeout = 20_000
                 readTimeout = 120_000
                 instanceFollowRedirects = false
-                buildDownloadHeaders(cookies).forEach { (k, v) ->
+                buildDownloadHeaders(cookies, userAgent).forEach { (k, v) ->
                     setRequestProperty(k, v)
                 }
                 if (rangeStart > 0) {
@@ -592,14 +596,14 @@ class YouTubeDownloadTask {
         throw Exception("Trop de redirections ($MAX_REDIRECTS)")
     }
 
-    private fun getContentLength(url: String, cookies: String?): Long {
+    private fun getContentLength(url: String, cookies: String?, userAgent: String? = null): Long {
         return try {
             val connection = URL(url).openConnection() as HttpURLConnection
             connection.apply {
                 requestMethod = "HEAD"
                 connectTimeout = 10_000
                 readTimeout = 10_000
-                buildDownloadHeaders(cookies).forEach { (k, v) ->
+                buildDownloadHeaders(cookies, userAgent).forEach { (k, v) ->
                     setRequestProperty(k, v)
                 }
             }

@@ -252,6 +252,14 @@ class YouTubeExtractor {
 
         fun isGoogleVideoUrl(url: String): Boolean =
             url.contains("googlevideo.com") || url.contains("/videoplayback")
+
+        /** UA a utiliser pour le telechargement des streams extraits par ce client */
+        fun downloadUserAgent(client: Client): String = when (client) {
+            Client.TV_EMBEDDED -> WEB_UA
+            Client.IOS          -> IOS_UA
+            Client.ANDROID      -> ANDROID_UA
+            Client.WEB          -> WEB_UA
+        }
     }
 
     // ── Data classes ──────────────────────────────────────────────────────────
@@ -268,7 +276,8 @@ class YouTubeExtractor {
         val hasAudio: Boolean,
         val itag: Int,
         val fps: Int = 0,
-        val audioQuality: String? = null
+        val audioQuality: String? = null,
+        val userAgent: String? = null
     ) {
         val isMuxed: Boolean get() = hasVideo && hasAudio
         val fileExtension: String get() = when {
@@ -458,9 +467,10 @@ class YouTubeExtractor {
             val videoOnly = mutableListOf<YouTubeStream>()
             val audioOnly = mutableListOf<YouTubeStream>()
 
+            val dlUA = downloadUserAgent(client)
             streamingData.optJSONArray("formats")?.let { arr ->
                 for (i in 0 until arr.length())
-                    parseFormat(arr.getJSONObject(i), true, true)?.let { muxed.add(it) }
+                    parseFormat(arr.getJSONObject(i), true, true, dlUA)?.let { muxed.add(it) }
             }
             streamingData.optJSONArray("adaptiveFormats")?.let { arr ->
                 for (i in 0 until arr.length()) {
@@ -468,9 +478,9 @@ class YouTubeExtractor {
                     val mime = obj.optString("mimeType")
                     when {
                         mime.startsWith("video/") ->
-                            parseFormat(obj, true, false)?.let { videoOnly.add(it) }
+                            parseFormat(obj, true, false, dlUA)?.let { videoOnly.add(it) }
                         mime.startsWith("audio/") ->
-                            parseFormat(obj, false, true)?.let { audioOnly.add(it) }
+                            parseFormat(obj, false, true, dlUA)?.let { audioOnly.add(it) }
                     }
                 }
             }
@@ -502,7 +512,7 @@ class YouTubeExtractor {
 
     // ── Format parsing ────────────────────────────────────────────────────────
 
-    private fun parseFormat(obj: JSONObject, hasVideo: Boolean, hasAudio: Boolean): YouTubeStream? {
+    private fun parseFormat(obj: JSONObject, hasVideo: Boolean, hasAudio: Boolean, downloadUA: String): YouTubeStream? {
         return try {
             val url = obj.optString("url").takeIf { it.isNotEmpty() }
                 ?: decodeCipher(
@@ -528,7 +538,8 @@ class YouTubeExtractor {
                 hasAudio     = hasAudio,
                 itag         = obj.optInt("itag", 0),
                 fps          = obj.optInt("fps", 0),
-                audioQuality = obj.optString("audioQuality").takeIf { it.isNotEmpty() }
+                audioQuality = obj.optString("audioQuality").takeIf { it.isNotEmpty() },
+                userAgent    = downloadUA
             )
         } catch (e: Exception) {
             Log.w(TAG, "Format parse erreur: ${e.message}")
