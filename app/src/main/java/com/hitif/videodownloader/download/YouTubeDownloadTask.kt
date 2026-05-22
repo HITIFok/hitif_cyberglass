@@ -40,6 +40,20 @@ import java.util.concurrent.TimeUnit
  * - Cookies conditionnels (uniquement si extraction avec sessionClient).
  * - Headers adaptes au client (Sec-Fetch-* uniquement avec UA navigateur).
  * - User-Agent identique entre extraction et telechargement.
+ *
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * AMELIORATIONS V4 (2025) — Retry avec refreshStreamUrl sur 403 :
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *
+ * Quand un telechargement recoit HTTP 403 (URL expiree), au lieu d'echouer
+ * directement, le task appelle YouTubeExtractor.refreshStreamUrl() pour obtenir
+ * une URL fraiche depuis l'API InnerTube, puis retente le telechargement.
+ *
+ * Strategie de retry :
+ * 1. Tentative initiale avec l'URL extraite
+ * 2. Si 403 → refreshStreamUrl() pour obtenir une nouvelle URL
+ * 3. Re-essai avec la nouvelle URL (jusqu'a MAX_DOWNLOAD_ATTEMPTS)
+ * 4. Si le refresh echoue aussi → retry avec l'URL originale + delai croissant
  * ═══════════════════════════════════════════════════════════════════════════════
  */
 class YouTubeDownloadTask {
@@ -50,6 +64,8 @@ class YouTubeDownloadTask {
 
         private const val MAX_DOWNLOAD_ATTEMPTS = 3
         private const val RETRY_DELAY_MS = 2_000L
+        /** Max attempts for DASH stream download (video/audio separately) */
+        private const val MAX_STREAM_ATTEMPTS = 3
 
         // ── Clients OkHttp pour le telechargement ────────────────────────────
         // Meme stack HTTP que YouTubeExtractor → fingerprint TLS identique.
@@ -232,7 +248,9 @@ class YouTubeDownloadTask {
                     userAgent = strategy.stream.userAgent,
                     sendCookies = useSession,
                     knownContentLength = strategy.stream.contentLength,
-                    callback = callback
+                    callback = callback,
+                    videoId = result.videoId,
+                    itag = strategy.stream.itag
                 )
             }
 
@@ -245,7 +263,8 @@ class YouTubeDownloadTask {
                     outputDir = outputDir,
                     fileName = fileName,
                     sendCookies = useSession,
-                    callback = callback
+                    callback = callback,
+                    videoId = result.videoId
                 )
             }
 
@@ -262,6 +281,15 @@ class YouTubeDownloadTask {
 
     // ── Download single stream (muxed) ─────────────────────────────────────
 
+    /**
+     * Download a single muxed stream with retry and URL refresh on 403.
+     *
+     * V4 improvement: When a 403 occurs, calls YouTubeExtractor.refreshStreamUrl()
+     * to obtain a fresh URL from the InnerTube API before retrying.
+     *
+     * @param videoId YouTube video ID — used for URL refresh on 403.
+     * @param itag Stream itag — used to find the matching format during refresh.
+     */
     private suspend fun downloadSingleStream(
         httpClient: OkHttpClient,
         url: String,
@@ -269,18 +297,49 @@ class YouTubeDownloadTask {
         userAgent: String?,
         sendCookies: Boolean,
         knownContentLength: Long = -1L,
-        callback: ProgressCallback
+        callback: ProgressCallback,
+        videoId: String? = null,
+        itag: Int? = null
     ) = withContext(Dispatchers.IO) {
         outputFile.parentFile?.mkdirs()
         val tempFile = File(outputFile.parent, "${outputFile.name}.tmp")
 
         var lastError: String? = null
+        var currentUrl = url       // Mutable: may be replaced by refreshStreamUrl()
+        var urlRefreshed = false   // Track if we already attempted a refresh
 
         for (attempt in 1..MAX_DOWNLOAD_ATTEMPTS) {
             try {
                 if (attempt > 1) {
                     Log.d(TAG, "Tentative $attempt/$MAX_DOWNLOAD_ATTEMPTS apres erreur: $lastError")
-                    delay(RETRY_DELAY_MS * attempt)
+
+                    // V4: On 403, try to refresh the URL via InnerTube API
+                    if (lastError?.contains("403") == true &&
+                        !urlRefreshed &&
+                        videoId != null &&
+                        itag != null
+                    ) {
+                        Log.d(TAG, "HTTP 403 detecte — tentative refreshStreamUrl " +
+                            "pour videoId=$videoId itag=$itag...")
+                        delay(RETRY_DELAY_MS) // Brief delay before refresh
+                        try {
+                            val refreshedUrl = YouTubeExtractor().refreshStreamUrl(videoId, itag)
+                            if (refreshedUrl != null) {
+                                currentUrl = refreshedUrl
+                                urlRefreshed = true
+                                Log.d(TAG, "URL refresh reussi! Nouvelle URL obtenue. Retentative...")
+                            } else {
+                                Log.w(TAG, "URL refresh echoue (aucun format trouve). " +
+                                    "Retentative avec l'URL originale...")
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "URL refresh exception: ${e.message}. " +
+                                "Retentative avec l'URL originale...")
+                        }
+                    } else {
+                        delay(RETRY_DELAY_MS * attempt)
+                    }
+
                     tempFile.delete()
                 }
 
@@ -295,8 +354,8 @@ class YouTubeDownloadTask {
                     tempFile.delete()
                 }
 
-                // Construire et executer la requete OkHttp
-                val request = buildDownloadRequest(url, userAgent, sendCookies, rangeStart = startByte)
+                // Construire et executer la requete OkHttp avec l'URL (potentiellement refreshée)
+                val request = buildDownloadRequest(currentUrl, userAgent, sendCookies, rangeStart = startByte)
                     .build()
 
                 val response = httpClient.newCall(request).execute()
@@ -304,7 +363,7 @@ class YouTubeDownloadTask {
                 val contentType = response.body?.contentType()?.toString() ?: ""
                 val contentLengthFromServer = response.body?.contentLength() ?: -1L
 
-                Log.d(TAG, "OkHttp HTTP $code (Content-Type: $contentType, CL: $contentLengthFromServer) pour: ${url.take(100)}...")
+                Log.d(TAG, "OkHttp HTTP $code (Content-Type: $contentType, CL: $contentLengthFromServer) pour: ${currentUrl.take(100)}...")
 
                 when {
                     code == 200 || code == 206 -> {
@@ -442,6 +501,9 @@ class YouTubeDownloadTask {
         val finalError = buildString {
             append("Echec apres $MAX_DOWNLOAD_ATTEMPTS tentatives. ")
             append(lastError ?: "Erreur inconnue")
+            if (urlRefreshed) {
+                append(" (URL refresh a ete tente sans succes)")
+            }
             append(". Astuce: rechargez la page YouTube et reessayez.")
         }
         callback.onError(finalError)
@@ -456,7 +518,8 @@ class YouTubeDownloadTask {
         outputDir: File,
         fileName: String,
         sendCookies: Boolean,
-        callback: ProgressCallback
+        callback: ProgressCallback,
+        videoId: String? = null
     ) = withContext(Dispatchers.IO) {
         outputDir.mkdirs()
 
@@ -473,10 +536,13 @@ class YouTubeDownloadTask {
                 file = videoTemp,
                 userAgent = video.userAgent,
                 sendCookies = sendCookies,
-                knownContentLength = video.contentLength
-            ) { percent ->
-                callback.onProgress((percent * 0.6).toInt(), 0, 0)
-            }
+                knownContentLength = video.contentLength,
+                onProgress = { percent ->
+                    callback.onProgress((percent * 0.6).toInt(), 0, 0)
+                },
+                videoId = videoId,
+                itag = video.itag
+            )
 
             // Etape 2/3: Telecharger l'audio (60-90%)
             Log.d(TAG, "DASH Step 2/3: Telechargement audio (${audio.qualityLabel})")
@@ -486,10 +552,13 @@ class YouTubeDownloadTask {
                 file = audioTemp,
                 userAgent = audio.userAgent,
                 sendCookies = sendCookies,
-                knownContentLength = audio.contentLength
-            ) { percent ->
-                callback.onProgress(60 + (percent * 0.3).toInt(), 0, 0)
-            }
+                knownContentLength = audio.contentLength,
+                onProgress = { percent ->
+                    callback.onProgress(60 + (percent * 0.3).toInt(), 0, 0)
+                },
+                videoId = videoId,
+                itag = audio.itag
+            )
 
             // Etape 3/3: Fusion MediaMuxer (90-100%)
             Log.d(TAG, "DASH Step 3/3: Fusion audio+video -> $outputFile")
@@ -521,85 +590,144 @@ class YouTubeDownloadTask {
     /**
      * Telecharge un stream unique vers un fichier (DASH video/audio).
      * Utilise OkHttp — PAS de requete HEAD prealable.
+     *
+     * V4: Ajout du retry avec refreshStreamUrl sur HTTP 403.
+     *
+     * @param videoId YouTube video ID — used for URL refresh on 403.
+     * @param itag Stream itag — used to find the matching format during refresh.
      */
-    private fun downloadStreamToFile(
+    private suspend fun downloadStreamToFile(
         httpClient: OkHttpClient,
         url: String,
         file: File,
         userAgent: String?,
         sendCookies: Boolean,
         knownContentLength: Long = -1L,
-        onProgress: (Int) -> Unit
+        onProgress: (Int) -> Unit,
+        videoId: String? = null,
+        itag: Int? = null
     ) {
-        file.parentFile?.mkdirs()
-        var downloaded = 0L
-        var totalBytes = knownContentLength
+        var currentUrl = url       // Mutable: may be replaced by refreshStreamUrl()
+        var urlRefreshed = false   // Track if we already attempted a refresh
 
-        val request = buildDownloadRequest(url, userAgent, sendCookies).build()
-        val response = httpClient.newCall(request).execute()
+        for (attempt in 1..MAX_STREAM_ATTEMPTS) {
+            try {
+                file.parentFile?.mkdirs()
+                var downloaded = 0L
+                var totalBytes = knownContentLength
 
-        val code = response.code
-        if (code == 403) {
-            val errorBody = response.body?.string()?.take(300)
-            response.close()
-            throw Exception("HTTP 403 Forbidden sur stream DASH. Detail: $errorBody")
-        }
-        if (code !in 200..299) {
-            val errorBody = response.body?.string()?.take(200)
-            response.close()
-            throw Exception("HTTP $code inattendu sur stream DASH. Detail: $errorBody")
-        }
+                val request = buildDownloadRequest(currentUrl, userAgent, sendCookies).build()
+                val response = httpClient.newCall(request).execute()
 
-        val contentLengthFromServer = response.body?.contentLength() ?: -1L
-        if (contentLengthFromServer > 0) {
-            totalBytes = contentLengthFromServer
-        }
-
-        Log.d(TAG, "DASH stream: HTTP $code CL=$totalBytes pour: ${url.take(80)}...")
-
-        val body = response.body ?: throw Exception("Response body null (DASH)")
-        val inputStream = body.byteStream()
-
-        try {
-            // First-byte content sniffing
-            val firstBytes = ByteArray(16)
-            val bytesRead = inputStream.read(firstBytes)
-            if (bytesRead > 0) {
-                if (!isMediaContent(firstBytes, bytesRead)) {
-                    Log.e(TAG, "DASH stream: contenu non-media detecte (premiers bytes). URL expiree?")
-                    throw Exception("Contenu non-media detecte dans le stream DASH. URL expiree.")
-                }
-            }
-
-            FileOutputStream(file).use { fos ->
-                if (bytesRead > 0) {
-                    fos.write(firstBytes, 0, bytesRead)
-                    downloaded += bytesRead
-                    if (totalBytes > 0) onProgress(((downloaded * 100) / totalBytes).toInt())
-                }
-
-                val buffer = ByteArray(BUFFER_SIZE)
-                var read: Int
-                while (inputStream.read(buffer).also { read = it } != -1) {
-                    fos.write(buffer, 0, read)
-                    downloaded += read
-                    if (totalBytes > 0) {
-                        onProgress(((downloaded * 100) / totalBytes).toInt())
+                val code = response.code
+                if (code == 403) {
+                    val errorBody = response.body?.string()?.take(300)
+                    response.close()
+                    if (!urlRefreshed && videoId != null && itag != null && attempt < MAX_STREAM_ATTEMPTS) {
+                        Log.d(TAG, "DASH stream HTTP 403 — tentative refreshStreamUrl " +
+                            "pour videoId=$videoId itag=$itag (attempt $attempt/$MAX_STREAM_ATTEMPTS)...")
+                        delay(RETRY_DELAY_MS)
+                        try {
+                            val refreshedUrl = YouTubeExtractor().refreshStreamUrl(videoId, itag)
+                            if (refreshedUrl != null) {
+                                currentUrl = refreshedUrl
+                                urlRefreshed = true
+                                Log.d(TAG, "DASH stream URL refresh reussi! Retentative avec nouvelle URL...")
+                                file.delete()
+                                continue
+                            } else {
+                                Log.w(TAG, "DASH stream URL refresh echoue. Relance avec delai...")
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "DASH stream URL refresh exception: ${e.message}")
+                        }
                     }
+                    delay(RETRY_DELAY_MS * attempt)
+                    throw Exception("HTTP 403 Forbidden sur stream DASH. Detail: $errorBody")
+                }
+                if (code !in 200..299) {
+                    val errorBody = response.body?.string()?.take(200)
+                    response.close()
+                    if (attempt < MAX_STREAM_ATTEMPTS) {
+                        Log.d(TAG, "DASH stream HTTP $code, retry (attempt $attempt/$MAX_STREAM_ATTEMPTS)...")
+                        delay(RETRY_DELAY_MS * attempt)
+                        file.delete()
+                        continue
+                    }
+                    throw Exception("HTTP $code inattendu sur stream DASH. Detail: $errorBody")
+                }
+
+                val contentLengthFromServer = response.body?.contentLength() ?: -1L
+                if (contentLengthFromServer > 0) {
+                    totalBytes = contentLengthFromServer
+                }
+
+                Log.d(TAG, "DASH stream: HTTP $code CL=$totalBytes pour: ${currentUrl.take(80)}...")
+
+                val body = response.body ?: throw Exception("Response body null (DASH)")
+                val inputStream = body.byteStream()
+
+                try {
+                    // First-byte content sniffing
+                    val firstBytes = ByteArray(16)
+                    val bytesRead = inputStream.read(firstBytes)
+                    if (bytesRead > 0) {
+                        if (!isMediaContent(firstBytes, bytesRead)) {
+                            Log.e(TAG, "DASH stream: contenu non-media detecte (premiers bytes). URL expiree?")
+                            inputStream.close()
+                            response.close()
+                            if (attempt < MAX_STREAM_ATTEMPTS) {
+                                delay(RETRY_DELAY_MS)
+                                file.delete()
+                                continue
+                            }
+                            throw Exception("Contenu non-media detecte dans le stream DASH. URL expiree.")
+                        }
+                    }
+
+                    FileOutputStream(file).use { fos ->
+                        if (bytesRead > 0) {
+                            fos.write(firstBytes, 0, bytesRead)
+                            downloaded += bytesRead
+                            if (totalBytes > 0) onProgress(((downloaded * 100) / totalBytes).toInt())
+                        }
+
+                        val buffer = ByteArray(BUFFER_SIZE)
+                        var read: Int
+                        while (inputStream.read(buffer).also { read = it } != -1) {
+                            fos.write(buffer, 0, read)
+                            downloaded += read
+                            if (totalBytes > 0) {
+                                onProgress(((downloaded * 100) / totalBytes).toInt())
+                            }
+                        }
+                    }
+                } finally {
+                    try { inputStream.close() } catch (_: Exception) {}
+                    response.close()
+                }
+
+                // Validate downloaded DASH stream
+                if (file.exists() && !validateDownloadedFile(file)) {
+                    file.delete()
+                    if (attempt < MAX_STREAM_ATTEMPTS) {
+                        Log.w(TAG, "DASH stream: fichier invalide, retry (attempt $attempt/$MAX_STREAM_ATTEMPTS)...")
+                        delay(RETRY_DELAY_MS)
+                        continue
+                    }
+                    throw Exception("Stream DASH telecharge invalide (pas un media). URL expiree.")
+                }
+
+                Log.d(TAG, "Stream telecharge: ${file.name} (${file.length() / 1024}KB)")
+                return // Success — exit the retry loop
+
+            } catch (e: Exception) {
+                Log.w(TAG, "DASH stream error (attempt $attempt/$MAX_STREAM_ATTEMPTS): ${e.message}")
+                if (attempt >= MAX_STREAM_ATTEMPTS) {
+                    throw e // Give up after all attempts
                 }
             }
-        } finally {
-            try { inputStream.close() } catch (_: Exception) {}
-            response.close()
         }
-
-        // Validate downloaded DASH stream
-        if (file.exists() && !validateDownloadedFile(file)) {
-            file.delete()
-            throw Exception("Stream DASH telecharge invalide (pas un media). URL expiree.")
-        }
-
-        Log.d(TAG, "Stream telecharge: ${file.name} (${file.length() / 1024}KB)")
     }
 
     // ── MediaMuxer merge ──────────────────────────────────────────────────
