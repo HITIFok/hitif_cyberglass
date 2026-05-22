@@ -628,7 +628,7 @@ class YouTubeExtractor {
                 null
             }
         }
-        null
+        return null
     }
 
     // ── Parsing ───────────────────────────────────────────────────────────────
